@@ -22,7 +22,7 @@ pub use self::rpc_session::MockRpcSession;
 #[doc(inline)]
 pub use self::{
     backoff_delayer::BackoffDelayer,
-    heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
+    heartbeat::{Heartbeat, IdleTimeout, PingInterval},
     reconnect_handle::{ReconnectError, ReconnectHandle},
     rpc_session::{
         RpcSession, SessionError, SessionState, WebSocketRpcSession,
@@ -168,14 +168,14 @@ pub enum CloseReason {
 /// into a closed state.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClosedStateReason {
-    /// Connection with server was lost.
-    ConnectionLost(CloseMsg),
-
-    /// Error while creating connection between client and server.
-    ConnectionFailed(platform::TransportError),
-
     /// Indicates that connection with server has never been established.
     NeverConnected,
+
+    /// Error while creating connection between client and server.
+    CouldNotEstablish(platform::TransportError),
+
+    /// Connection with server was lost.
+    ConnectionLost(ConnectionLostReason),
 
     /// First received [`ServerMsg`] after [`WebSocketRpcClient::connect`] is
     /// not [`ServerMsg::RpcSettings`][1].
@@ -183,6 +183,11 @@ pub enum ClosedStateReason {
     /// [`ServerMsg`]: medea_client_api_proto::ServerMsg
     /// [1]: medea_client_api_proto::ServerMsg::RpcSettings
     FirstServerMsgIsNotRpcSettings,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ConnectionLostReason {
+    WithMessage(CloseMsg),
 
     /// Connection has been inactive for a while and thus considered idle
     /// by a client.
@@ -196,14 +201,6 @@ pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
     RpcTransportError(#[js(cause)] platform::TransportError),
-
-    /// Occurs if the heartbeat cannot be started.
-    #[display(fmt = "Start heartbeat failed: {}", _0)]
-    CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
-
-    /// Occurs if `socket` of [`WebSocketRpcClient`] is unexpectedly `None`.
-    #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
-    NoSocket,
 
     /// Occurs if [`Weak`] pointer to the [`WebSocketRpcClient`] can't be
     /// upgraded to [`Rc`].

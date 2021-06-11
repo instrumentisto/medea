@@ -19,7 +19,7 @@ use tracerr::Traced;
 
 use crate::{
     media::LocalTracksConstraints,
-    peer::PeerError,
+    peer::UpdateLocalStreamError,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
 
@@ -121,7 +121,8 @@ impl TracksRepository<sender::State> {
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+    ) -> LocalBoxFuture<'static, Result<(), Traced<UpdateLocalStreamError>>>
+    {
         let senders = self.0.borrow();
         Box::pin(
             future::try_join_all(tracks_ids.into_iter().filter_map(|id| {

@@ -6,14 +6,16 @@ pub mod receiver;
 pub mod sender;
 mod transitable_state;
 
-use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use derive_more::Display;
-use futures::{channel::mpsc, future, future::LocalBoxFuture};
+use derive_more::{Display, From};
+use futures::{
+    channel::mpsc, future, future::LocalBoxFuture, FutureExt as _,
+    TryFutureExt as _,
+};
 use medea_client_api_proto as proto;
 #[cfg(feature = "mockable")]
 use medea_client_api_proto::{MediaType, MemberId};
-use medea_reactive::DroppedError;
 use proto::{MediaSourceKind, TrackId};
 use tracerr::Traced;
 
@@ -98,7 +100,7 @@ pub trait MediaStateControllable {
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,
-    ) -> Result<()> {
+    ) -> std::result::Result<(), Traced<ProhibitedState>> {
         match desired_state {
             MediaState::MediaExchange(desired_state) => {
                 self.media_exchange_state_controller()
@@ -185,14 +187,18 @@ pub trait MediaStateControllable {
     fn when_media_state_stable(
         &self,
         desired_state: MediaState,
-    ) -> LocalBoxFuture<'static, Result<()>> {
+    ) -> LocalBoxFuture<'static, Result<(), MediaState>> {
         match desired_state {
             MediaState::Mute(desired_state) => self
                 .mute_state_controller()
-                .when_media_state_stable(desired_state),
+                .when_media_state_stable(desired_state)
+                .map_err(MediaState::Mute)
+                .boxed_local(),
             MediaState::MediaExchange(desired_state) => self
                 .media_exchange_state_controller()
-                .when_media_state_stable(desired_state),
+                .when_media_state_stable(desired_state)
+                .map_err(MediaState::MediaExchange)
+                .boxed_local(),
         }
     }
 }
@@ -207,34 +213,39 @@ pub enum TrackDirection {
     Recv,
 }
 
-/// Errors that may occur in [`MediaConnections`] storage.
-#[derive(Clone, Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
-pub enum MediaConnectionsError {
-    /// Occurs when the provided [`local::Track`] cannot be inserted into
-    /// provided [`Sender`]s transceiver.
+/// Media state transition is not allowed.
+///
+/// E.g. cannot disable required [`Sender`].
+///
+/// [`Sender`]: self::sender::Sender
+#[derive(Clone, Debug, Display, From)]
+pub enum ProhibitedState {
+    /// Some [`Sender`] can't be disabled because it required.
     ///
     /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
-    CouldNotInsertLocalTrack(platform::Error),
+    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
+                     disabled state, because this Sender is required.")]
+    CannotDisableRequiredSender,
+}
 
-    /// Occurs when [`remote::Track`] discovered by a
-    /// [`platform::RtcPeerConnection`] couldn't be inserted into a
-    /// [`Receiver`].
+#[derive(Clone, Debug, Display, JsCaused, From)]
+#[js(error = "platform::Error")]
+pub enum InsertLocalTracksError {
+    /// Occurs when [`local::Track`] does not satisfy [`Sender`] constraints.
     ///
-    /// [`remote::Track`]: crate::media::track::remote::Track
-    /// [`Receiver`]: self::receiver::Receiver
-    #[display(
-        fmt = "Could not insert remote track with mid: {:?} into media \
-               connections",
-        _0
-    )]
-    CouldNotInsertRemoteTrack(String),
+    /// [`Sender`]: self::sender::Sender
+    #[display(fmt = "Provided Track does not satisfy senders constraints")]
+    InvalidMediaTrack,
 
-    /// Could not find a [`platform::Transceiver`] by `mid`.
-    #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
-    TransceiverNotFound(String),
+    /// Occurs when not enough [`local::Track`]s are inserted into senders.
+    #[display(fmt = "Provided stream does not have all necessary Tracks")]
+    NotEnoughTracks,
 
+    InsertTrackError(sender::InsertTrackError),
+}
+
+#[derive(Clone, Debug, Display)]
+pub enum GetMidsError {
     /// Occurs when cannot get the `mid` from the [`Sender`].
     ///
     /// [`Sender`]: self::sender::Sender
@@ -246,52 +257,7 @@ pub enum MediaConnectionsError {
     /// [`Receiver`]: self::receiver::Receiver
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
-
-    /// Occurs when not enough [`local::Track`]s are inserted into senders.
-    #[display(fmt = "Provided stream does not have all necessary Tracks")]
-    InvalidMediaTracks,
-
-    /// Occurs when [`local::Track`] does not satisfy [`Sender`] constraints.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "Provided Track does not satisfy senders constraints")]
-    InvalidMediaTrack,
-
-    /// Occurs when [`MediaExchangeState`] of [`Sender`] was dropped.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "MediaExchangeState of Sender was dropped.")]
-    MediaExchangeStateDropped,
-
-    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
-    /// to expected [`MediaState`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "MediaState of Sender transits into opposite to \
-                     expected MediaExchangeState")]
-    MediaStateTransitsIntoOppositeState,
-
-    /// Invalid [`medea_client_api_proto::TrackPatchEvent`] for
-    /// [`local::Track`].
-    #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
-    InvalidTrackPatch(TrackId),
-
-    /// Some [`Sender`] can't be disabled because it required.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
-                     disabled state, because this Sender is required.")]
-    CannotDisableRequiredSender,
 }
-
-impl From<DroppedError> for MediaConnectionsError {
-    #[inline]
-    fn from(_: DroppedError) -> Self {
-        Self::MediaExchangeStateDropped
-    }
-}
-
-type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -477,7 +443,9 @@ impl MediaConnections {
     /// [`Receiver`]: self::receiver::Receiver
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+    pub fn get_mids(
+        &self,
+    ) -> Result<HashMap<TrackId, String>, Traced<GetMidsError>> {
         let inner = self.0.borrow();
         let mut mids =
             HashMap::with_capacity(inner.senders.len() + inner.receivers.len());
@@ -486,7 +454,7 @@ impl MediaConnections {
                 *track_id,
                 sender
                     .mid()
-                    .ok_or(MediaConnectionsError::SendersWithoutMid)
+                    .ok_or(GetMidsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
         }
@@ -495,7 +463,7 @@ impl MediaConnections {
                 *track_id,
                 receiver
                     .mid()
-                    .ok_or(MediaConnectionsError::ReceiversWithoutMid)
+                    .ok_or(GetMidsError::ReceiversWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
         }
@@ -595,8 +563,8 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// With [`MediaConnectionsError::InvalidMediaTracks`] if provided
-    /// [`HashMap`] doesn't contain required [`local::Track`].
+    /// With [`MediaConnectionsError::NotEnoughTracks`] if provided [`HashMap`]
+    /// doesn't contain required [`local::Track`].
     ///
     /// With [`MediaConnectionsError::InvalidMediaTrack`] if some
     /// [`local::Track`] cannot be inserted into associated [`Sender`] because
@@ -611,7 +579,10 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, Rc<local::Track>>,
-    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
+    ) -> Result<
+        HashMap<TrackId, media_exchange_state::Stable>,
+        Traced<InsertLocalTracksError>,
+    > {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track =
             Vec::with_capacity(self.0.borrow().senders.len());
@@ -626,12 +597,12 @@ impl MediaConnections {
                     sender_and_track.push((sender.obj(), track));
                 } else {
                     return Err(tracerr::new!(
-                        MediaConnectionsError::InvalidMediaTrack
+                        InsertLocalTracksError::InvalidMediaTrack
                     ));
                 }
             } else if sender.caps().required() {
                 return Err(tracerr::new!(
-                    MediaConnectionsError::InvalidMediaTracks
+                    InsertLocalTracksError::NotEnoughTracks
                 ));
             } else {
                 media_exchange_state_updates.insert(
@@ -643,11 +614,11 @@ impl MediaConnections {
 
         future::try_join_all(sender_and_track.into_iter().map(
             |(sender, track)| async move {
-                Rc::clone(&sender).insert_track(track).await?;
-                Ok::<(), Traced<MediaConnectionsError>>(())
+                Rc::clone(&sender).insert_track(track).await
             },
         ))
-        .await?;
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(media_exchange_state_updates)
     }
@@ -672,7 +643,7 @@ impl MediaConnections {
         &self,
         track: platform::MediaStreamTrack,
         transceiver: platform::Transceiver,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         let inner = self.0.borrow();
         // Cannot fail, since transceiver is guaranteed to be negotiated at this
         // point.
@@ -686,9 +657,7 @@ impl MediaConnections {
                 }
             }
         }
-        Err(tracerr::new!(
-            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
-        ))
+        Err(mid)
     }
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without
@@ -881,7 +850,7 @@ impl MediaConnections {
         mid: Option<String>,
         receivers: Vec<MemberId>,
         send_constraints: &LocalTracksConstraints,
-    ) -> Result<sender::Component> {
+    ) -> Result<sender::Component, Traced<sender::CreateError>> {
         let sender_state = sender::State::new(
             id,
             mid.clone(),
@@ -932,7 +901,7 @@ impl MediaConnections {
         tracks: Vec<proto::Track>,
         send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<sender::CreateError>> {
         use medea_client_api_proto::Direction;
         for track in tracks {
             match track.direction {

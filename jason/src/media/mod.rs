@@ -3,7 +3,7 @@
 //! [1]: https://w3.org/TR/mediacapture-streams
 
 pub mod constraints;
-mod manager;
+pub mod manager;
 pub mod track;
 
 use derive_more::Display;
@@ -17,7 +17,7 @@ pub use self::{
         MultiSourceTracksConstraints, RecvConstraints, TrackConstraints,
         VideoSource, VideoTrackConstraints,
     },
-    manager::{MediaManager, MediaManagerError, MediaManagerHandle},
+    manager::{MediaManager, MediaManagerHandle},
     track::MediaSourceKind,
 };
 

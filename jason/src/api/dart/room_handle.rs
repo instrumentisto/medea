@@ -39,7 +39,6 @@ impl From<Traced<RoomError>> for DartError {
             | RoomError::FailedTrackPatch(_)
             | RoomError::MediaConnections(_)
             | RoomError::SessionError(_)
-            | RoomError::MediaManagerError(_)
             | RoomError::ConnectionInfoParse(_) => {
                 todo!()
             }

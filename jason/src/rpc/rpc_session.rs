@@ -59,7 +59,7 @@ pub enum SessionError {
 
     /// [`WebSocketRpcClient`] lost connection with a server.
     #[display(fmt = "Connection with a server was lost")]
-    ConnectionLost,
+    ConnectionLost(ConnectionLostReason),
 
     /// [`WebSocketRpcSession::connect`] called while connecting to the server.
     ///
@@ -225,13 +225,8 @@ impl WebSocketRpcSession {
                 S::Initialized(_) => {
                     return Err(tracerr::new!(E::NewConnectionInfo));
                 }
-                S::Lost(err, _) => {
-                    // TODO: Clone Traced and add new Frame to it when Traced
-                    //       cloning will be implemented.
-                    return Err(tracerr::new!(AsRef::<SessionError>::as_ref(
-                        &err.as_ref()
-                    )
-                    .clone()));
+                S::Lost(reason, _) => {
+                    return Err(tracerr::new!(E::ConnectionLost(reason)));
                 }
                 S::Uninitialized => {
                     return Err(tracerr::new!(E::AuthorizationFailed));
@@ -261,13 +256,15 @@ impl WebSocketRpcSession {
                         match Rc::clone(&this.client)
                             .connect(info.url.clone())
                             .await
-                            .map_err(tracerr::map_from_and_wrap!())
                         {
                             Ok(_) => {
                                 this.state.set(S::Authorizing(info));
                             }
                             Err(e) => {
-                                this.state.set(S::Lost(Rc::new(e), info));
+                                this.state.set(S::Lost(
+                                    ConnectionLostReason::Client(e),
+                                    info,
+                                ));
                             }
                         }
                     }
@@ -295,7 +292,7 @@ impl WebSocketRpcSession {
         let mut client_on_connection_loss = self.client.on_connection_loss();
         let weak_this = Rc::downgrade(self);
         platform::spawn(async move {
-            while client_on_connection_loss.next().await.is_some() {
+            while let Some(reason) = client_on_connection_loss.next().await {
                 let this = upgrade_or_break!(weak_this);
 
                 let state = this.state.get();
@@ -307,9 +304,7 @@ impl WebSocketRpcSession {
                     | S::Authorizing(info)
                     | S::Opened(info) => {
                         this.state.set(S::Lost(
-                            Rc::new(tracerr::new!(
-                                SessionError::ConnectionLost
-                            )),
+                            ConnectionLostReason::Lost(reason),
                             info,
                         ));
                     }
@@ -623,7 +618,7 @@ pub enum SessionState {
 
     /// Connection with a server was lost but can be recovered.
     Lost(
-        #[derivative(PartialEq = "ignore")] Rc<Traced<SessionError>>,
+        #[derivative(PartialEq = "ignore")] ConnectionLostReason,
         Rc<ConnectionInfo>,
     ),
 
@@ -633,4 +628,10 @@ pub enum SessionState {
 
     /// Terminal state: transport is closed and can not be reopened.
     Finished(CloseReason),
+}
+
+#[derive(Clone, Debug)]
+pub enum ConnectionLostReason {
+    Client(Traced<RpcClientError>),
+    Lost(super::ConnectionLostReason),
 }

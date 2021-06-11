@@ -4,8 +4,10 @@ mod component;
 
 use std::{cell::Cell, rc::Rc};
 
+use derive_more::{Display, From};
 use futures::channel::mpsc;
 use medea_client_api_proto::TrackId;
+use tracerr::Traced;
 
 use crate::{
     media::{
@@ -13,15 +15,37 @@ use crate::{
     },
     peer::TrackEvent,
     platform,
+    utils::JsCaused,
 };
 
 use super::{
-    media_exchange_state, mute_state, MediaConnections, MediaConnectionsError,
-    MediaStateControllable, Result,
+    media_exchange_state, mute_state, MediaConnections, MediaStateControllable,
 };
 
 #[doc(inline)]
 pub use self::component::{Component, State};
+
+#[derive(Clone, Debug, Display)]
+pub enum CreateError {
+    /// Some [`Sender`] can't be disabled because it required.
+    ///
+    /// [`Sender`]: self::sender::Sender
+    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
+                     disabled state, because this Sender is required.")]
+    CannotDisableRequiredSender,
+
+    /// Could not find a [`platform::Transceiver`] by `mid`.
+    #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
+    TransceiverNotFound(String),
+}
+
+/// Error from the [`RTCRtpSender.replaceTrack()`][1] method call.
+///
+/// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+#[derive(Debug, Display, Clone, JsCaused, From)]
+#[js(error = "platform::Error")]
+#[display(fmt = "MediaManagerHandle is in detached state")]
+pub struct InsertTrackError(platform::Error);
 
 /// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
@@ -52,7 +76,7 @@ impl Sender {
         media_connections: &MediaConnections,
         send_constraints: LocalTracksConstraints,
         track_events_sender: mpsc::UnboundedSender<TrackEvent>,
-    ) -> Result<Rc<Self>> {
+    ) -> Result<Rc<Self>, Traced<CreateError>> {
         let enabled_in_cons = send_constraints.enabled(state.media_type());
         let muted_in_cons = send_constraints.muted(state.media_type());
         let media_disabled = state.is_muted()
@@ -61,7 +85,7 @@ impl Sender {
             || muted_in_cons;
         if state.media_type().required() && media_disabled {
             return Err(tracerr::new!(
-                MediaConnectionsError::CannotDisableRequiredSender
+                CreateError::CannotDisableRequiredSender
             ));
         }
 
@@ -88,7 +112,7 @@ impl Sender {
             Some(mid) => connections
                 .get_transceiver_by_mid(mid)
                 .ok_or_else(|| {
-                    MediaConnectionsError::TransceiverNotFound(mid.to_string())
+                    CreateError::TransceiverNotFound(mid.to_string())
                 })
                 .map_err(tracerr::wrap!())?,
         };
@@ -161,7 +185,7 @@ impl Sender {
     pub(super) async fn insert_track(
         self: Rc<Self>,
         new_track: Rc<local::Track>,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<InsertTrackError>> {
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
             if new_track.id() == current_track.id() {
@@ -176,7 +200,7 @@ impl Sender {
         self.transceiver
             .set_send_track(Rc::new(new_track))
             .await
-            .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
+            .map_err(InsertTrackError::from)
             .map_err(tracerr::wrap!())?;
 
         Ok(())

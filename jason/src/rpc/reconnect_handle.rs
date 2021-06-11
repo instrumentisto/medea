@@ -2,7 +2,7 @@
 
 use std::{rc::Weak, time::Duration};
 
-use derive_more::{Display, From};
+use derive_more::Display;
 use tracerr::Traced;
 
 use crate::{
@@ -12,16 +12,50 @@ use crate::{
 };
 
 /// Errors occurring in a [`ReconnectHandle`].
-#[derive(Clone, Debug, From, Display, JsCaused)]
+#[derive(Clone, Debug, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum ReconnectError {
-    /// Some [`SessionError`] has occurred while reconnecting.
-    #[display(fmt = "{}", _0)]
-    Session(#[js(cause)] SessionError),
+    SessionFinished,
+
+    ConnectionLost,
+
+    Internal,
+
+    AuthorizationFailed,
 
     /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "Reconnector is in detached state")]
+    #[display(fmt = "ReconnectHandle is in detached state")]
     Detached,
+}
+
+impl From<SessionError> for ReconnectError {
+    fn from(_err: SessionError) -> Self {
+        // use SessionError as SE;
+        // use ReconnectError as RE;
+        //
+        // match err {
+        //     SE::SessionFinished(cr) => RE::SessionFinished(),
+        //     SE::NoCredentials => RE::Internal,
+        //     SE::AuthorizationFailed => RE::AuthorizationFailed,
+        //     SE::RpcClient(client) => match client {
+        //         RpcClientError::RpcTransportError(err) => match err {
+        //             TransportError::CreateSocket(pe) => {}
+        //             TransportError::InitSocket => {}
+        //             TransportError::SerializeClientMessage(ser) => {}
+        //             TransportError::ParseServerMessage(de) => {}
+        //             TransportError::MessageNotString => {}
+        //             TransportError::SendMessage(pe) => {}
+        //             TransportError::ClosedSocket => {}
+        //         },
+        //         RpcClientError::ConnectionFailed(err) => {}
+        //         RpcClientError::RpcClientGone => RE::Internal,
+        //     },
+        //     SE::SessionUnexpectedlyDropped => RE::Internal,
+        //     SE::ConnectionLost(clr) => RE::ConnectionLost,
+        //     SE::NewConnectionInfo => RE::Internal,
+        // }
+        todo!()
+    }
 }
 
 /// External handle used to reconnect to a media server when connection is lost.

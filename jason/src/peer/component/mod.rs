@@ -19,7 +19,7 @@ use crate::{
     media::LocalTracksConstraints,
     peer::{
         media::{receiver, sender},
-        LocalStreamUpdateCriteria, PeerConnection, PeerError,
+        LocalStreamUpdateCriteria, PeerConnection, UpdateLocalStreamError,
     },
     utils::{component, AsProtoState, SynchronizableState, Updatable},
 };
@@ -292,7 +292,8 @@ impl State {
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+    ) -> LocalBoxFuture<'static, Result<(), Traced<UpdateLocalStreamError>>>
+    {
         Box::pin(
             self.senders
                 .local_stream_update_result(tracks_ids)
@@ -319,17 +320,13 @@ impl State {
     async fn update_local_stream(
         &self,
         peer: &Rc<PeerConnection>,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Traced<UpdateLocalStreamError>> {
         let mut criteria = LocalStreamUpdateCriteria::empty();
         let senders = self.senders.get_outdated();
         for s in &senders {
             criteria.add(s.media_kind(), s.media_source());
         }
-        let res = peer
-            .update_local_stream(criteria)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-            .map(drop);
+        let res = peer.update_local_stream(criteria).await.map(drop);
         for s in senders {
             if let Err(err) = res.clone() {
                 s.failed_local_stream_update(err);

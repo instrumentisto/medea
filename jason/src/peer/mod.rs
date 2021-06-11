@@ -29,9 +29,10 @@ use crate::{
     api::JasonError,
     connection::Connections,
     media::{
+        manager::InitLocalTracksError,
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
-        MediaStreamSettings, RecvConstraints,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
+        RecvConstraints,
     },
     platform,
     utils::JsCaused,
@@ -41,12 +42,13 @@ use crate::{
 pub use self::{
     component::{Component, State},
     media::{
-        media_exchange_state, mute_state, receiver, sender, MediaConnections,
-        MediaConnectionsError, MediaExchangeState,
+        media_exchange_state, mute_state, receiver, sender, GetMidsError,
+        InsertLocalTracksError, MediaConnections, MediaExchangeState,
         MediaExchangeStateController, MediaState, MediaStateControllable,
-        MuteState, MuteStateController, TrackDirection, TransceiverSide,
-        TransitableState, TransitableStateController,
+        MuteState, MuteStateController, ProhibitedState, TrackDirection,
+        TransceiverSide, TransitableState, TransitableStateController,
     },
+    platform::RtcPeerConnectionError,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
 };
@@ -56,29 +58,28 @@ pub use self::{
 /// [1]: https://w3.org/TR/webrtc#rtcpeerconnection-interface
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
-pub enum PeerError {
-    /// Errors that may occur in [`MediaConnections`] storage.
-    #[display(fmt = "{}", _0)]
-    MediaConnections(#[js(cause)] MediaConnectionsError),
-
-    /// Errors that may occur in a [`MediaManager`].
-    #[display(fmt = "{}", _0)]
-    MediaManager(#[js(cause)] MediaManagerError),
-
-    /// Errors that may occur during signaling between this and remote
-    /// [RTCPeerConnection][1] and event handlers setting errors.
-    ///
-    /// [1]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
-    #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js(cause)] platform::RtcPeerConnectionError),
-
+pub enum UpdateLocalStreamError {
     /// Errors that may occur when validating [`TracksRequest`] or parsing
     /// [`local::Track`]s.
-    #[display(fmt = "{}", _0)]
-    TracksRequest(#[js(cause)] TracksRequestError),
-}
+    InvalidLocalTracks(#[js(cause)] TracksRequestError),
 
-type Result<T> = std::result::Result<T, Traced<PeerError>>;
+    /// Errors that may occur in a [`MediaManager`].
+    CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
+
+    InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
+
+    ProhibitedState(ProhibitedState),
+
+    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
+    /// to expected [`MediaState`].
+    ///
+    /// [`Sender`]: self::sender::Sender
+    #[display(
+        fmt = "MediaState of Sender transits into opposite to expected \
+                MediaExchangeState"
+    )]
+    TransitionIntoOppositeState(MediaState),
+}
 
 /// Events emitted from a [`Sender`] or a [`Receiver`].
 ///
@@ -310,7 +311,7 @@ impl PeerConnection {
         send_constraints: LocalTracksConstraints,
         connections: Rc<Connections>,
         recv_constraints: Rc<RecvConstraints>,
-    ) -> Result<Rc<Self>> {
+    ) -> Result<Rc<Self>, Traced<RtcPeerConnectionError>> {
         let peer = Rc::new(
             platform::RtcPeerConnection::new(
                 state.ice_servers().clone(),
@@ -386,11 +387,10 @@ impl PeerConnection {
         // Bind to `track` event.
         let media_connections = Rc::clone(&peer.media_connections);
         peer.peer.on_track(Some(move |track, transceiver| {
-            if let Err(e) = media_connections
-                .add_remote_track(track, transceiver)
-                .map_err(tracerr::map_from_and_wrap!(=> PeerError))
+            if let Err(e) =
+                media_connections.add_remote_track(track, transceiver)
             {
-                log::error!("{}", e);
+                log::error!("Could not add new remote track with mid = {}", e);
             };
         }));
 
@@ -505,7 +505,7 @@ impl PeerConnection {
             .peer
             .get_stats()
             .await
-            .map_err(tracerr::map_from_and_wrap!(=> PeerError))
+            .map_err(tracerr::map_from_and_wrap!(=> RtcPeerConnectionError))
         {
             Ok(stats) => self.send_peer_stats(stats),
             Err(e) => log::error!("{}", e),
@@ -638,11 +638,13 @@ impl PeerConnection {
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://w3.org/TR/webrtc/#rtcrtptransceiver-interface
     #[inline]
-    fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+    fn get_mids(
+        &self,
+    ) -> Result<HashMap<TrackId, String>, Traced<GetMidsError>> {
         let mids = self
             .media_connections
             .get_mids()
-            .map_err(tracerr::map_from_and_wrap!())?;
+            .map_err(tracerr::wrap!())?;
 
         Ok(mids)
     }
@@ -695,7 +697,7 @@ impl PeerConnection {
     /// [`MediaManagerError::GetDisplayMediaFailed`] if corresponding request to
     /// UA failed.
     ///
-    /// With [`MediaConnectionsError::InvalidMediaTracks`],
+    /// With [`MediaConnectionsError::NotEnoughTracks`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
     /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
     /// [`local::Track`] couldn't inserted into [`PeerConnection`]s [`Sender`]s.
@@ -706,7 +708,10 @@ impl PeerConnection {
     pub async fn update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
+    ) -> Result<
+        HashMap<TrackId, media_exchange_state::Stable>,
+        Traced<UpdateLocalStreamError>,
+    > {
         self.inner_update_local_stream(criteria).await.map_err(|e| {
             drop(self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
@@ -731,7 +736,10 @@ impl PeerConnection {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<Option<MediaStreamSettings>> {
+    ) -> std::result::Result<
+        Option<MediaStreamSettings>,
+        Traced<TracksRequestError>,
+    > {
         let mut criteria = LocalStreamUpdateCriteria::empty();
         if let Some(source_kind) = source_kind {
             criteria.add(kind, source_kind);
@@ -755,7 +763,10 @@ impl PeerConnection {
     fn get_simple_tracks_request(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> Result<Option<SimpleTracksRequest>> {
+    ) -> std::result::Result<
+        Option<SimpleTracksRequest>,
+        Traced<TracksRequestError>,
+    > {
         let request = if let Some(req) =
             self.media_connections.get_tracks_request(criteria)
         {
@@ -776,7 +787,10 @@ impl PeerConnection {
     async fn inner_update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
+    ) -> Result<
+        HashMap<TrackId, media_exchange_state::Stable>,
+        Traced<UpdateLocalStreamError>,
+    > {
         if let Some(required_caps) = self
             .get_simple_tracks_request(criteria)
             .map_err(tracerr::map_from_and_wrap!())?
@@ -835,7 +849,10 @@ impl PeerConnection {
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     /// [3]: platform::RtcPeerConnectionError::SetRemoteDescriptionFailed
-    async fn set_remote_answer(&self, answer: String) -> Result<()> {
+    async fn set_remote_answer(
+        &self,
+        answer: String,
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         self.set_remote_description(platform::SdpType::Answer(answer))
             .await
             .map_err(tracerr::wrap!())
@@ -850,7 +867,10 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-    async fn set_remote_offer(&self, offer: String) -> Result<()> {
+    async fn set_remote_offer(
+        &self,
+        offer: String,
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         self.set_remote_description(platform::SdpType::Offer(offer))
             .await
             .map_err(tracerr::wrap!())
@@ -874,7 +894,7 @@ impl PeerConnection {
     async fn set_remote_description(
         &self,
         desc: platform::SdpType,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         self.peer
             .set_remote_description(desc)
             .await
@@ -920,7 +940,7 @@ impl PeerConnection {
         candidate: String,
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         if self.has_remote_description.get() {
             self.peer
                 .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
@@ -954,11 +974,10 @@ impl PeerConnection {
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
     /// [`RtcStats`].
-    pub async fn get_stats(&self) -> Result<platform::RtcStats> {
-        self.peer
-            .get_stats()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+    pub async fn get_stats(
+        &self,
+    ) -> Result<platform::RtcStats, Traced<RtcPeerConnectionError>> {
+        self.peer.get_stats().await
     }
 
     /// Indicates whether all [`Receiver`]s audio tracks are enabled.
