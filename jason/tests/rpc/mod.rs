@@ -1,7 +1,7 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
-mod backoff_delayer;
 mod heartbeat;
+mod reconnect_handle;
 mod rpc_session;
 mod websocket;
 
@@ -549,10 +549,8 @@ mod on_connection_loss {
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().times(3).returning(move || {
                     on_message_mock(RpcSettings {
-                        idle_timeout_ms: idle_timeout_ms
-                            .unwrap_or(u32::max_value()),
-                        ping_interval_ms: ping_interval_ms
-                            .unwrap_or(u32::max_value()),
+                        idle_timeout_ms: idle_timeout_ms.unwrap_or(u32::MAX),
+                        ping_interval_ms: ping_interval_ms.unwrap_or(u32::MAX),
                     })
                 });
                 transport.expect_set_close_reason().return_once(drop);

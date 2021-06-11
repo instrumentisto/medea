@@ -6,6 +6,26 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.3.0] · 2021-??-?? · To-be-done
+[0.3.0]: /../../tree/medea-jason-0.3.0/jason
+
+[Diff](/../../compare/medea-jason-0.2.0...medea-jason-0.3.0) | [Milestone](/../../milestone/3) | [Roadmap](/../../issues/182)
+
+### BC Breaks
+
+- Library API:
+    - `ReconnectHandle.reconnect_with_backoff()` performs first reconnect attempt immediately now ([#206]).
+
+### Added
+
+- Library API:
+    - Optional argument to `ReconnectHandle.reconnect_with_backoff()` function that limits max elapsed time ([#206]).
+
+[#206]: /../../pull/206
+
+
+
+
 ## [0.2.0] · 2021-04-09
 [0.2.0]: /../../tree/medea-jason-0.2.0/jason
 

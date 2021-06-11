@@ -17,13 +17,13 @@ Feature: Local tracks are created
   Scenario: Local video track is created when member enables video
     Given room with joined member Alice with disabled media publishing
     And joined member Bob
-    When Alice enables video
+    When Alice enables video and awaits it completes
     Then Alice has 1 local tracks
     And Alice has local device video
 
   Scenario: Local audio track is created when member enables audio
     Given room with joined member Alice with disabled media publishing
     And joined member Bob
-    When Alice enables audio
+    When Alice enables audio and awaits it completes
     Then Alice has 1 local tracks
     And Alice has local audio

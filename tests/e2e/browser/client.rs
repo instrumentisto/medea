@@ -207,7 +207,7 @@ impl Inner {
     /// Closes the provided [`WebWindow`].
     pub async fn close_window(&mut self, window: WebWindow) {
         if self.0.switch_to_window(window).await.is_ok() {
-            let _ = self.0.close_window().await;
+            drop(self.0.close_window().await);
         }
     }
 
