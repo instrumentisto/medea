@@ -31,9 +31,9 @@ use crate::{
     },
     peer::{
         self, media::ProhibitedState, media_exchange_state, mute_state,
-        LocalStreamUpdateCriteria, MediaState, PeerConnection, PeerEvent,
-        PeerEventHandler, TrackDirection, TracksRequestError,
-        UpdateLocalStreamError,
+        InsertLocalTracksError, LocalStreamUpdateCriteria, MediaState,
+        PeerConnection, PeerEvent, PeerEventHandler, TrackDirection,
+        TracksRequestError, UpdateLocalStreamError,
     },
     platform,
     rpc::{
@@ -156,6 +156,11 @@ pub enum RoomJoinError {
 #[js(error = "platform::Error")]
 pub struct HandleDetachedError;
 
+/// Errors that can occur when changing media state of [`Sender`]s and
+/// [`Receiver`]s.
+///
+/// [`Sender`]: peer::media::Sender
+/// [`Receiver`]: peer::media::Receiver
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum ChangeMediaStateError {
@@ -164,20 +169,49 @@ pub enum ChangeMediaStateError {
     Detached,
 
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    TracksRequestError(TracksRequestError),
+    InvalidLocalTracks(TracksRequestError),
 
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
     InitLocalTracksError(#[js(cause)] InitLocalTracksError),
 
-    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    UpdateLocalStreamError(#[js(cause)] UpdateLocalStreamError),
+    InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
+
+    /// Requested state transition is not allowed by [`Sender`]'s settings.
+    ///
+    /// [`Sender`]: peer::media::Sender
+    ProhibitedState(ProhibitedState),
+
+    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
+    /// to the requested [`MediaState`].
+    ///
+    /// [`Sender`]: peer::media::Sender
+    #[display(
+        fmt = "MediaState of Sender transits into opposite ({})  to the \
+                requested MediaExchangeState",
+        _0
+    )]
+    TransitionIntoOppositeState(MediaState),
 }
 
 impl From<GetLocalTracksError> for ChangeMediaStateError {
     fn from(err: GetLocalTracksError) -> Self {
         match err {
-            GetLocalTracksError::TracksRequestError(err) => Self::from(err),
+            GetLocalTracksError::InvalidLocalTracks(err) => Self::from(err),
             GetLocalTracksError::InitLocalTracksErr(err) => Self::from(err),
+        }
+    }
+}
+
+impl From<UpdateLocalStreamError> for ChangeMediaStateError {
+    fn from(err: UpdateLocalStreamError) -> Self {
+        use UpdateLocalStreamError as UpdateErr;
+
+        match err {
+            UpdateErr::InvalidLocalTracks(e) => Self::from(e),
+            UpdateErr::CouldNotGetLocalMedia(e) => Self::from(e),
+            UpdateErr::InsertLocalTracksError(e) => Self::from(e),
+            UpdateErr::ProhibitedState(e) => Self::from(e),
+            UpdateErr::TransitionIntoOppositeState(e) => Self::from(e),
         }
     }
 }
@@ -187,7 +221,7 @@ impl From<GetLocalTracksError> for ChangeMediaStateError {
 pub enum GetLocalTracksError {
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
     #[display(fmt = "Room is in detached state")]
-    TracksRequestError(TracksRequestError),
+    InvalidLocalTracks(TracksRequestError),
 
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
     #[display(fmt = "Room is in detached state")]
@@ -242,80 +276,6 @@ impl RoomHandle {
             .connect(connection_info)
             .await
             .map_err(tracerr::map_from_and_wrap!( => RoomJoinError))?;
-
-        Ok(())
-    }
-
-    /// Enables or disables specified media and source types publish or receival
-    /// in all [`PeerConnection`]s.
-    async fn set_track_media_state(
-        &self,
-        new_state: MediaState,
-        kind: MediaKind,
-        direction: TrackDirection,
-        source_kind: Option<proto::MediaSourceKind>,
-    ) -> Result<(), Traced<ChangeMediaStateError>> {
-        let inner = (self.0)
-            .upgrade()
-            .ok_or_else(|| tracerr::new!(ChangeMediaStateError::Detached))?;
-        inner.set_constraints_media_state(
-            new_state,
-            kind,
-            direction,
-            source_kind,
-        );
-
-        let direction_send = matches!(direction, TrackDirection::Send);
-        let enabling = matches!(
-            new_state,
-            MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
-        );
-
-        // Perform `getUserMedia()`/`getDisplayMedia()` right away, so we can
-        // fail fast without touching senders states and starting all required
-        // messaging.
-        // Hold tracks through all process, to ensure that they will be reused
-        // without additional requests.
-        let _tracks_handles = if direction_send && enabling {
-            inner
-                .get_local_tracks(kind, source_kind)
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?
-        } else {
-            Vec::new()
-        };
-
-        while !inner.is_all_peers_in_media_state(
-            kind,
-            direction,
-            source_kind,
-            new_state,
-        ) {
-            if let Err(e) = inner
-                .toggle_media_state(new_state, kind, direction, source_kind)
-                .await
-                .map_err(tracerr::map_from_and_wrap!())
-            {
-                if direction_send && enabling {
-                    inner.set_constraints_media_state(
-                        new_state.opposite(),
-                        kind,
-                        direction,
-                        source_kind,
-                    );
-                    inner
-                        .toggle_media_state(
-                            new_state.opposite(),
-                            kind,
-                            direction,
-                            source_kind,
-                        )
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                }
-                return Err(e);
-            }
-        }
 
         Ok(())
     }
@@ -450,10 +410,9 @@ impl RoomHandle {
     ///
     /// Helper function for all the exported mute/unmute/enable/disable
     /// audio/video send/receive methods.
-    #[inline]
     async fn change_media_state<S>(
         &self,
-        media_state: S,
+        new_state: S,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
@@ -461,14 +420,73 @@ impl RoomHandle {
     where
         S: Into<MediaState> + 'static,
     {
-        self.set_track_media_state(
-            media_state.into(),
+        let inner = (self.0)
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ChangeMediaStateError::Detached))?;
+
+        let new_state = new_state.into();
+        let source_kind = source_kind.map(Into::into);
+
+        inner.set_constraints_media_state(
+            new_state,
             kind,
             direction,
-            source_kind.map(Into::into),
-        )
-        .await
-        .map_err(tracerr::wrap!())
+            source_kind,
+        );
+
+        let direction_send = matches!(direction, TrackDirection::Send);
+        let enabling = matches!(
+            new_state,
+            MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
+        );
+
+        // Perform `getUserMedia()`/`getDisplayMedia()` right away, so we can
+        // fail fast without touching senders states and starting all required
+        // messaging.
+        // Hold tracks through all process, to ensure that they will be reused
+        // without additional requests.
+        let _tracks_handles = if direction_send && enabling {
+            inner
+                .get_local_tracks(kind, source_kind)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?
+        } else {
+            Vec::new()
+        };
+
+        while !inner.is_all_peers_in_media_state(
+            kind,
+            direction,
+            source_kind,
+            new_state,
+        ) {
+            if let Err(e) = inner
+                .toggle_media_state(new_state, kind, direction, source_kind)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+            {
+                if direction_send && enabling {
+                    inner.set_constraints_media_state(
+                        new_state.opposite(),
+                        kind,
+                        direction,
+                        source_kind,
+                    );
+                    inner
+                        .toggle_media_state(
+                            new_state.opposite(),
+                            kind,
+                            direction,
+                            source_kind,
+                        )
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                }
+                return Err(e);
+            }
+        }
+
+        Ok(())
     }
 
     /// Mutes outbound audio in this [`Room`].
@@ -1248,7 +1266,7 @@ impl InnerRoom {
         direction: TrackDirection,
         source_kind: Option<proto::MediaSourceKind>,
     ) -> Result<(), Traced<UpdateLocalStreamError>> {
-        let disable_tracks: HashMap<_, _> = self
+        let tracks: HashMap<_, _> = self
             .peers
             .get_all()
             .into_iter()
@@ -1262,8 +1280,7 @@ impl InnerRoom {
                 (peer.id(), new_media_exchange_states)
             })
             .collect();
-
-        self.update_media_states(disable_tracks).await
+        self.update_media_states(tracks).await
     }
 
     /// Updates [`MediaState`]s of the [`TransceiverSide`] with the provided

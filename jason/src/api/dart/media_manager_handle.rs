@@ -2,7 +2,9 @@ use std::ptr;
 
 use tracerr::Traced;
 
-use crate::media::MediaManagerError;
+use crate::media::{
+    EnumerateDevicesError, GetDisplayMediaError, GetUserMediaError,
+};
 
 use super::{
     media_stream_settings::MediaStreamSettings,

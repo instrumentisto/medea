@@ -58,7 +58,7 @@ pub enum SessionError {
     SessionUnexpectedlyDropped,
 
     /// [`WebSocketRpcClient`] lost connection with a server.
-    #[display(fmt = "Connection with a server was lost")]
+    #[display(fmt = "Connection with a server was lost: {}", _0)]
     ConnectionLost(ConnectionLostReason),
 
     /// [`WebSocketRpcSession::connect`] called while connecting to the server.

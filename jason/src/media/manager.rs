@@ -35,13 +35,13 @@ pub enum InitLocalTracksError {
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[display(fmt = "Failed to get local tracks: {}", _0)]
-    GetUserMediaFailed(#[js(cause)] GetUserMediaErr),
+    GetUserMediaFailed(#[js(cause)] GetUserMediaError),
 
     /// Occurs if the [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "Failed to get local tracks: {}", _0)]
-    GetDisplayMediaFailed(#[js(cause)] GetDisplayMediaErr),
+    GetDisplayMediaFailed(#[js(cause)] GetDisplayMediaError),
 
     /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be
     /// upgraded.
@@ -64,7 +64,7 @@ struct LocalTrackIsEnded(pub MediaKind);
 /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
 #[derive(Debug, Display, Clone, JsCaused, From)]
 #[js(error = "platform::Error")]
-pub enum GetUserMediaErr {
+pub enum GetUserMediaError {
     /// Occurs if the [getUserMedia][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -81,7 +81,7 @@ pub enum GetUserMediaErr {
     LocalTrackIsEnded(MediaKind),
 }
 
-impl From<LocalTrackIsEnded> for GetUserMediaErr {
+impl From<LocalTrackIsEnded> for GetUserMediaError {
     #[inline]
     fn from(err: LocalTrackIsEnded) -> Self {
         Self::LocalTrackIsEnded(err.0)
@@ -93,7 +93,7 @@ impl From<LocalTrackIsEnded> for GetUserMediaErr {
 /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Debug, Display, Clone, JsCaused, From)]
 #[js(error = "platform::Error")]
-pub enum GetDisplayMediaErr {
+pub enum GetDisplayMediaError {
     /// Occurs if the [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
@@ -110,7 +110,7 @@ pub enum GetDisplayMediaErr {
     LocalTrackIsEnded(MediaKind),
 }
 
-impl From<LocalTrackIsEnded> for GetDisplayMediaErr {
+impl From<LocalTrackIsEnded> for GetDisplayMediaError {
     #[inline]
     fn from(err: LocalTrackIsEnded) -> Self {
         Self::LocalTrackIsEnded(err.0)
@@ -274,7 +274,7 @@ impl InnerMediaManager {
     async fn get_user_media(
         &self,
         caps: platform::MediaStreamConstraints,
-    ) -> Result<Vec<Rc<local::Track>>, Traced<GetUserMediaErr>> {
+    ) -> Result<Vec<Rc<local::Track>>, Traced<GetUserMediaError>> {
         let tracks = platform::get_user_media(caps)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
@@ -294,7 +294,7 @@ impl InnerMediaManager {
     async fn get_display_media(
         &self,
         caps: platform::DisplayMediaStreamConstraints,
-    ) -> Result<Vec<Rc<local::Track>>, Traced<GetDisplayMediaErr>> {
+    ) -> Result<Vec<Rc<local::Track>>, Traced<GetDisplayMediaError>> {
         let tracks = platform::get_display_media(caps)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;

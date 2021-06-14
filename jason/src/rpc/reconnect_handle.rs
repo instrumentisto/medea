@@ -18,13 +18,20 @@ use crate::{
 #[derive(Clone, Debug, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum ReconnectError {
-    SessionFinished(CloseReason),
-
+    /// Connection with a server was lost.
+    #[display(fmt = "Connection with a server was lost: {}", _0)]
     ConnectionLost(ConnectionLostReason),
 
-    Internal(Cow<'static, str>),
-
+    /// Could not authorize session.
+    #[display(fmt = "Failed to authorize RPC session")]
     AuthorizationFailed,
+
+    /// RPC Session is finished. This is a terminal state.
+    #[display(fmt = "RPC Session finished with {:?} close reason", _0)]
+    SessionFinished(CloseReason),
+
+    /// Internal error that is not meant to be handled by external users.
+    Internal(Cow<'static, str>),
 
     /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
     #[display(fmt = "ReconnectHandle is in detached state")]

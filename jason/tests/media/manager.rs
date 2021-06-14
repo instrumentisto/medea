@@ -10,7 +10,7 @@ use web_sys as sys;
 use medea_jason::{
     api,
     media::{
-        manager::{GetUserMediaErr, InitLocalTracksError},
+        manager::{GetUserMediaError, InitLocalTracksError},
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, MediaKind, MediaManager,
         MediaStreamSettings,
@@ -354,7 +354,7 @@ async fn new_tracks_should_be_live() {
         assert!(matches!(
             err,
             InitLocalTracksError::GetUserMediaFailed(
-                GetUserMediaErr::LocalTrackIsEnded(MediaKind::Audio)
+                GetUserMediaError::LocalTrackIsEnded(MediaKind::Audio)
             )
         ));
     } else {

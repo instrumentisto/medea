@@ -2,6 +2,8 @@
 //!
 //! [`MediaStateControllable`]: crate::peer::MediaStateControllable
 
+use derive_more::Display;
+
 mod controller;
 pub mod media_exchange_state;
 pub mod mute_state;
@@ -27,7 +29,7 @@ pub type MuteState =
 /// All media states which can be toggled in the [`MediaStateControllable`].
 ///
 /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
-#[derive(Clone, Copy, Debug, From)]
+#[derive(Clone, Copy, Debug, Display, From)]
 pub enum MediaState {
     /// Responsible for changing [`enabled`][1] property of
     /// [MediaStreamTrack][2].

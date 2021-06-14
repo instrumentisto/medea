@@ -185,8 +185,12 @@ pub enum ClosedStateReason {
     FirstServerMsgIsNotRpcSettings,
 }
 
+/// The reason of why [`WebSocketRpcClient`]/[`platform::RpcTransport`] lost
+/// connection to the server.
 #[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum ConnectionLostReason {
+    /// Connection has been closed with a close frame with the provided
+    /// message.
     WithMessage(CloseMsg),
 
     /// Connection has been inactive for a while and thus considered idle

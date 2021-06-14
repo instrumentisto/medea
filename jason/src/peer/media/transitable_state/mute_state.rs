@@ -1,9 +1,11 @@
 //! State of media mute state.
 
+use derive_more::Display;
+
 use super::{InStable, InTransition};
 
 /// State of media mute state.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum Stable {
     /// [`MediaStateControllable`] is muted.
     ///

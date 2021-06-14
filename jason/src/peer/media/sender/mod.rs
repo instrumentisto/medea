@@ -25,6 +25,7 @@ use super::{
 #[doc(inline)]
 pub use self::component::{Component, State};
 
+/// Errors returned from the [`Sender::new()`] method.
 #[derive(Clone, Debug, Display)]
 pub enum CreateError {
     /// Some [`Sender`] can't be disabled because it required.

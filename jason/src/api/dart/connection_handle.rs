@@ -5,7 +5,7 @@ use tracerr::Traced;
 
 use crate::{
     api::dart::utils::{DartError, DartResult, StateError},
-    connection::ConnectionError,
+    connection::HandlerDetachedError,
     platform,
 };
 
@@ -18,14 +18,10 @@ pub use crate::connection::ConnectionHandle;
 
 impl ForeignClass for ConnectionHandle {}
 
-impl From<Traced<ConnectionError>> for DartError {
+impl From<Traced<HandlerDetachedError>> for DartError {
     #[inline]
-    fn from(err: Traced<ConnectionError>) -> Self {
-        match err.into_inner() {
-            ConnectionError::Detached => {
-                StateError::new("ConnectionHandle is in detached state.").into()
-            }
-        }
+    fn from(err: Traced<HandlerDetachedError>) -> Self {
+        StateError::new("ConnectionHandle is in detached state.").into()
     }
 }
 
@@ -102,6 +98,7 @@ mod mock {
         api::RemoteMediaTrack,
         connection::{
             ConnectionError, ConnectionHandle as CoreConnectionHandle,
+            HandlerDetachedError,
         },
         platform,
     };
@@ -117,14 +114,14 @@ mod mock {
     impl ConnectionHandle {
         pub fn get_remote_member_id(
             &self,
-        ) -> Result<String, Traced<ConnectionError>> {
+        ) -> Result<String, Traced<HandlerDetachedError>> {
             Err(tracerr::new!(ConnectionError::Detached).into())
         }
 
         pub fn on_close(
             &self,
             f: platform::Function<()>,
-        ) -> Result<(), Traced<ConnectionError>> {
+        ) -> Result<(), Traced<HandlerDetachedError>> {
             f.call0();
             Ok(())
         }
@@ -132,7 +129,7 @@ mod mock {
         pub fn on_remote_track_added(
             &self,
             f: platform::Function<RemoteMediaTrack>,
-        ) -> Result<(), Traced<ConnectionError>> {
+        ) -> Result<(), Traced<HandlerDetachedError>> {
             f.call1(RemoteMediaTrack);
             Ok(())
         }
@@ -140,7 +137,7 @@ mod mock {
         pub fn on_quality_score_update(
             &self,
             f: platform::Function<u8>,
-        ) -> Result<(), Traced<ConnectionError>> {
+        ) -> Result<(), Traced<HandlerDetachedError>> {
             f.call1(4);
             Ok(())
         }

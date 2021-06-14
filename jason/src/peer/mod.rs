@@ -53,30 +53,31 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
 };
 
-/// Errors that may occur in [RTCPeerConnection][1].
-///
-/// [1]: https://w3.org/TR/webrtc#rtcpeerconnection-interface
+/// Errors returned from [`PeerConnection::update_local_stream()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum UpdateLocalStreamError {
-    /// Errors that may occur when validating [`TracksRequest`] or parsing
-    /// [`local::Track`]s.
-    InvalidLocalTracks(#[js(cause)] TracksRequestError),
+    /// Errors that may occur when validating [`TracksRequest`].
+    InvalidLocalTracks(TracksRequestError),
 
-    /// Errors that may occur in a [`MediaManager`].
+    /// Local media acquisition failure.
     CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 
+    /// Errors returned from the [`MediaConnections::insert_local_tracks()`]
+    /// method.
     InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
 
+    /// Requested state transition is not allowed by [`Sender`]'s settings.
     ProhibitedState(ProhibitedState),
 
     /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
-    /// to expected [`MediaState`].
+    /// to the requested [`MediaState`].
     ///
     /// [`Sender`]: self::sender::Sender
     #[display(
-        fmt = "MediaState of Sender transits into opposite to expected \
-                MediaExchangeState"
+        fmt = "MediaState of Sender transits into opposite ({})  to the \
+                requested MediaExchangeState",
+        _0
     )]
     TransitionIntoOppositeState(MediaState),
 }
@@ -736,10 +737,7 @@ impl PeerConnection {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> std::result::Result<
-        Option<MediaStreamSettings>,
-        Traced<TracksRequestError>,
-    > {
+    ) -> Result<Option<MediaStreamSettings>, Traced<TracksRequestError>> {
         let mut criteria = LocalStreamUpdateCriteria::empty();
         if let Some(source_kind) = source_kind {
             criteria.add(kind, source_kind);
@@ -763,10 +761,7 @@ impl PeerConnection {
     fn get_simple_tracks_request(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> std::result::Result<
-        Option<SimpleTracksRequest>,
-        Traced<TracksRequestError>,
-    > {
+    ) -> Result<Option<SimpleTracksRequest>, Traced<TracksRequestError>> {
         let request = if let Some(req) =
             self.media_connections.get_tracks_request(criteria)
         {

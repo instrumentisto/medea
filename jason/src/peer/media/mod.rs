@@ -43,9 +43,6 @@ pub use self::{
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
-///
-/// [`Sender`]: self::sender::Sender
-/// [`Receiver`]: self::receiver::Receiver
 pub trait TransceiverSide: MediaStateControllable {
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
@@ -100,7 +97,7 @@ pub trait MediaStateControllable {
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,
-    ) -> std::result::Result<(), Traced<ProhibitedState>> {
+    ) -> Result<(), Traced<ProhibitedState>> {
         match desired_state {
             MediaState::MediaExchange(desired_state) => {
                 self.media_exchange_state_controller()
@@ -216,24 +213,19 @@ pub enum TrackDirection {
 /// Media state transition is not allowed.
 ///
 /// E.g. cannot disable required [`Sender`].
-///
-/// [`Sender`]: self::sender::Sender
 #[derive(Clone, Debug, Display, From)]
 pub enum ProhibitedState {
     /// Some [`Sender`] can't be disabled because it required.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[display(fmt = "MediaExchangeState of Sender can't be transited into \
                      disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
 }
 
+/// Errors returned from the [`MediaConnections::insert_local_tracks()`] method.
 #[derive(Clone, Debug, Display, JsCaused, From)]
 #[js(error = "platform::Error")]
 pub enum InsertLocalTracksError {
     /// Occurs when [`local::Track`] does not satisfy [`Sender`] constraints.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
@@ -241,20 +233,18 @@ pub enum InsertLocalTracksError {
     #[display(fmt = "Provided stream does not have all necessary Tracks")]
     NotEnoughTracks,
 
+    /// Occurs if insertion of [`local::Track`] into [`Sender`] fails.
     InsertTrackError(sender::InsertTrackError),
 }
 
+/// Errors returned from the [`MediaConnections::get_mids()`] method.
 #[derive(Clone, Debug, Display)]
 pub enum GetMidsError {
     /// Occurs when cannot get the `mid` from the [`Sender`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[display(fmt = "Peer has senders without mid")]
     SendersWithoutMid,
 
     /// Occurs when cannot get the `mid` from the [`Receiver`].
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
 }
@@ -264,9 +254,6 @@ struct InnerMediaConnections {
     /// Reference to the parent [`platform::RtcPeerConnection`].
     ///
     /// Used to generate transceivers for [`Sender`]s and [`Receiver`]s.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     peer: Rc<platform::RtcPeerConnection>,
 
     /// [`PeerEvent`]s tx.
@@ -374,9 +361,6 @@ impl MediaConnections {
     /// Returns all [`Sender`]s and [`Receiver`]s from this [`MediaConnections`]
     /// with provided [`MediaKind`], [`TrackDirection`] and
     /// [`MediaSourceKind`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     pub fn get_transceivers_sides(
         &self,
         kind: MediaKind,
@@ -439,8 +423,6 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(
@@ -472,9 +454,6 @@ impl MediaConnections {
 
     /// Returns activity statuses of the all the [`Sender`]s and [`Receiver`]s
     /// from these [`MediaConnections`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
 
@@ -530,8 +509,6 @@ impl MediaConnections {
     /// Returns [`TracksRequest`] based on [`Sender`]s in this
     /// [`MediaConnections`]. [`Sender`]s are chosen based on provided
     /// [`LocalStreamUpdateCriteria`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub fn get_tracks_request(
         &self,
         kinds: LocalStreamUpdateCriteria,
@@ -574,7 +551,6 @@ impl MediaConnections {
     /// [`local::Track`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
-    /// [`Sender`]: self::sender::Sender
     /// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
@@ -636,8 +612,6 @@ impl MediaConnections {
     /// supposed to happen, since [`platform::MediaStreamTrack`] is only fired
     /// when a [`platform::Transceiver`] is negotiated, thus have a [`mid`].
     ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn add_remote_track(
         &self,
@@ -665,7 +639,6 @@ impl MediaConnections {
     /// [`platform::Transceiver`] in the [`platform::RtcPeerConnection`] and to
     /// insert it into the [`Receiver`].
     ///
-    /// [`Receiver`]: self::receiver::Receiver
     /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
@@ -684,8 +657,6 @@ impl MediaConnections {
 
     /// Returns all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub fn get_senders_without_tracks_ids(
         &self,
         kinds: LocalStreamUpdateCriteria,
@@ -709,8 +680,6 @@ impl MediaConnections {
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
         let remove_tracks_fut = future::join_all(
             self.0.borrow().senders.values().filter_map(|s| {
@@ -741,8 +710,6 @@ impl MediaConnections {
 impl MediaConnections {
     /// Indicates whether all [`Receiver`]s with [`MediaKind::Video`] are
     /// enabled.
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[must_use]
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
@@ -754,8 +721,6 @@ impl MediaConnections {
 
     /// Indicates whether if all [`Receiver`]s with [`MediaKind::Audio`] are
     /// enabled.
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[must_use]
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
@@ -766,8 +731,6 @@ impl MediaConnections {
     }
 
     /// Returns [`Receiver`] with the provided [`TrackId`].
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[must_use]
     pub fn get_receiver_by_id(
         &self,
@@ -777,16 +740,12 @@ impl MediaConnections {
     }
 
     /// Returns [`Sender`] with a provided [`TrackId`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<sender::Sender>> {
         self.0.borrow().senders.get(&id).map(|r| r.obj())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
@@ -796,8 +755,6 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_video_enabled(
         &self,
@@ -813,8 +770,6 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]'s video tracks are unmuted.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_video_unmuted(
         &self,
@@ -831,8 +786,6 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]'s audio tracks are unmuted.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_audio_unmuted(&self) -> bool {
         self.0
@@ -931,8 +884,6 @@ impl MediaConnections {
     }
 
     /// Returns all underlying [`Sender`]'s.
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub fn get_senders(&self) -> Vec<Rc<sender::Sender>> {
         self.0
             .borrow()
