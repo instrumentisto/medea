@@ -76,7 +76,7 @@ async fn reconnect_with_backoff() {
         .into_inner();
     let elapsed = start.elapsed().as_millis();
     assert!(elapsed >= 200 && elapsed < 300);
-    assert!(matches!(err, ReconnectError::Session(_)));
+    assert!(matches!(err, ReconnectError::ConnectionLost(_)));
 
     // Checks that reconnect attempts are made for an expected period.
     let start = instant::Instant::now();
@@ -87,7 +87,7 @@ async fn reconnect_with_backoff() {
         .into_inner();
     let elapsed = start.elapsed().as_millis();
     assert!(elapsed >= 444 && elapsed < 555);
-    assert!(matches!(err, ReconnectError::Session(_)));
+    assert!(matches!(err, ReconnectError::ConnectionLost(_)));
 
     // Checks that reconnect returns Ok immediately after a successful attempt.
     platform::spawn({

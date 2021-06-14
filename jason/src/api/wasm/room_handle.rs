@@ -164,7 +164,6 @@ impl RoomHandle {
             )
             .await
             .map_err(ConstraintsUpdateException::from)?;
-
             Ok(JsValue::UNDEFINED)
         })
     }

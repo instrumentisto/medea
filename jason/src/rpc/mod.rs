@@ -185,7 +185,7 @@ pub enum ClosedStateReason {
     FirstServerMsgIsNotRpcSettings,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum ConnectionLostReason {
     WithMessage(CloseMsg),
 
@@ -216,17 +216,19 @@ pub enum RpcClientError {
 }
 
 /// Connection with remote was closed.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
     /// Determines by close code `1000` and existence of
     /// [`CloseByServerReason`].
+    #[display(fmt = "Normal. Code: {}, Reason: {}", _0, _1)]
     Normal(u16, CloseByServerReason),
 
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///
     /// Unexpected close determines by non-`1000` close code and for close code
     /// `1000` without reason.
+    #[display(fmt = "Abnormal. Code: {}", _0)]
     Abnormal(u16),
 }

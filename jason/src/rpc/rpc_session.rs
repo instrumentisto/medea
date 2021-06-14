@@ -630,8 +630,26 @@ pub enum SessionState {
     Finished(CloseReason),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Display)]
 pub enum ConnectionLostReason {
     Client(Traced<RpcClientError>),
     Lost(super::ConnectionLostReason),
+}
+
+impl JsCaused for ConnectionLostReason {
+    type Error = platform::Error;
+
+    fn name(&self) -> &'static str {
+        match self {
+            ConnectionLostReason::Client(_) => "Client",
+            ConnectionLostReason::Lost(_) => "Lost",
+        }
+    }
+
+    fn js_cause(self) -> Option<Self::Error> {
+        match self {
+            ConnectionLostReason::Client(err) => err.into_inner().js_cause(),
+            ConnectionLostReason::Lost(_) => None,
+        }
+    }
 }

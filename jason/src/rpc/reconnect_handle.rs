@@ -1,13 +1,16 @@
 //! Reconnection for [`RpcSession`].
 
-use std::{rc::Weak, time::Duration};
+use std::{borrow::Cow, rc::Weak, time::Duration};
 
 use derive_more::Display;
 use tracerr::Traced;
 
 use crate::{
     platform,
-    rpc::{BackoffDelayer, RpcSession, SessionError},
+    rpc::{
+        rpc_session::ConnectionLostReason, BackoffDelayer, CloseReason,
+        RpcSession, SessionError,
+    },
     utils::JsCaused,
 };
 
@@ -15,11 +18,11 @@ use crate::{
 #[derive(Clone, Debug, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum ReconnectError {
-    SessionFinished,
+    SessionFinished(CloseReason),
 
-    ConnectionLost,
+    ConnectionLost(ConnectionLostReason),
 
-    Internal,
+    Internal(Cow<'static, str>),
 
     AuthorizationFailed,
 
@@ -29,32 +32,19 @@ pub enum ReconnectError {
 }
 
 impl From<SessionError> for ReconnectError {
-    fn from(_err: SessionError) -> Self {
-        // use SessionError as SE;
-        // use ReconnectError as RE;
-        //
-        // match err {
-        //     SE::SessionFinished(cr) => RE::SessionFinished(),
-        //     SE::NoCredentials => RE::Internal,
-        //     SE::AuthorizationFailed => RE::AuthorizationFailed,
-        //     SE::RpcClient(client) => match client {
-        //         RpcClientError::RpcTransportError(err) => match err {
-        //             TransportError::CreateSocket(pe) => {}
-        //             TransportError::InitSocket => {}
-        //             TransportError::SerializeClientMessage(ser) => {}
-        //             TransportError::ParseServerMessage(de) => {}
-        //             TransportError::MessageNotString => {}
-        //             TransportError::SendMessage(pe) => {}
-        //             TransportError::ClosedSocket => {}
-        //         },
-        //         RpcClientError::ConnectionFailed(err) => {}
-        //         RpcClientError::RpcClientGone => RE::Internal,
-        //     },
-        //     SE::SessionUnexpectedlyDropped => RE::Internal,
-        //     SE::ConnectionLost(clr) => RE::ConnectionLost,
-        //     SE::NewConnectionInfo => RE::Internal,
-        // }
-        todo!()
+    fn from(err: SessionError) -> Self {
+        use ReconnectError as RE;
+        use SessionError as SE;
+
+        match err {
+            SE::SessionFinished(cr) => RE::SessionFinished(cr),
+            SE::NoCredentials
+            | SE::SessionUnexpectedlyDropped
+            | SE::NewConnectionInfo => RE::Internal(err.to_string().into()),
+            SE::AuthorizationFailed => RE::AuthorizationFailed,
+            SE::RpcClient(client) => RE::Internal(client.to_string().into()),
+            SE::ConnectionLost(clr) => RE::ConnectionLost(clr),
+        }
     }
 }
 

@@ -30,6 +30,7 @@ async fn then_member_has_remote_track(
     kind: String,
     remote_id: String,
 ) {
+    world.wait_for_interconnection(&id).await.unwrap();
     let member = world.get_member(&id).unwrap();
     let connection = member
         .connections()
