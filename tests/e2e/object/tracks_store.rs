@@ -39,6 +39,10 @@ impl<T> Object<TracksStore<T>> {
 
     /// Waits this [`TracksStore`] to contain `count` tracks.
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
+        if count == 0 {
+            return Ok(());
+        }
+
         self.execute(Statement::new(
             // language=JavaScript
             r#"

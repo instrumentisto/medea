@@ -150,6 +150,7 @@ async fn then_remote_media_track(
     partner_id: String,
     state: String,
 ) {
+    world.wait_for_interconnection(&id).await.unwrap();
     let member = world.get_member(&id).unwrap();
     let partner_connection = member
         .connections()
