@@ -168,12 +168,16 @@ pub enum ChangeMediaStateError {
     #[display(fmt = "Room is in detached state")]
     Detached,
 
-    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
+    /// Errors that may occur when validating [`TracksRequest`].
     InvalidLocalTracks(TracksRequestError),
 
-    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    InitLocalTracksError(#[js(cause)] InitLocalTracksError),
+    /// [`MediaManager`] failed to acquire [`local::Track`]s.
+    CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 
+    /// Occurs when local tracks could not be inserted into [`Sender`]s of some
+    /// [`PeerConnection`] in this [`Room`].
+    ///
+    /// [`Sender`]: peer::media::Sender
     InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
 
     /// Requested state transition is not allowed by [`Sender`]'s settings.
@@ -197,7 +201,7 @@ impl From<GetLocalTracksError> for ChangeMediaStateError {
     fn from(err: GetLocalTracksError) -> Self {
         match err {
             GetLocalTracksError::InvalidLocalTracks(err) => Self::from(err),
-            GetLocalTracksError::InitLocalTracksErr(err) => Self::from(err),
+            GetLocalTracksError::CouldNotGetLocalMedia(err) => Self::from(err),
         }
     }
 }
@@ -216,16 +220,18 @@ impl From<UpdateLocalStreamError> for ChangeMediaStateError {
     }
 }
 
+/// Errors that occur when [`Room`] is acquiring [`local::Track`]s from the
+/// [`MediaManager`].
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum GetLocalTracksError {
-    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
+    /// Errors that may occur when validating [`TracksRequest`].
     #[display(fmt = "Room is in detached state")]
     InvalidLocalTracks(TracksRequestError),
 
-    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
+    /// [`MediaManager`] failed to acquire [`local::Track`]s.
     #[display(fmt = "Room is in detached state")]
-    InitLocalTracksErr(#[js(cause)] InitLocalTracksError),
+    CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 }
 
 impl RoomHandle {
@@ -1002,6 +1008,7 @@ struct InnerRoom {
 /// Exception for a [`RoomHandle::set_local_media_settings`].
 #[derive(Debug, Display)]
 pub enum ConstraintsUpdateException {
+    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
     #[display(fmt = "RecoveredException")]
     Detached,
 

@@ -1837,7 +1837,7 @@ async fn no_updates_sent_if_gum_fails_on_enable() {
         .await
         .unwrap_err();
     let e = get_jason_error(err);
-    assert_eq!(e.name(), "InitLocalTracksError");
+    assert_eq!(e.name(), "CouldNotGetLocalMedia");
     assert_eq!(
         e.message(),
         "Failed to get local tracks: MediaDevices.getUserMedia() failed: \

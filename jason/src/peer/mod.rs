@@ -60,7 +60,7 @@ pub enum UpdateLocalStreamError {
     /// Errors that may occur when validating [`TracksRequest`].
     InvalidLocalTracks(TracksRequestError),
 
-    /// Local media acquisition failure.
+    /// [`MediaManager`] failed to acquire [`local::Track`]s.
     CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 
     /// Errors returned from the [`MediaConnections::insert_local_tracks()`]
