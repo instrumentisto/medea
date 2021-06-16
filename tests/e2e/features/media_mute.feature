@@ -45,5 +45,5 @@ Feature: Media muting
     Given room with joined members Alice and Bob
     When Bob mutes audio and awaits it completes
     Then `on_muted` callback fires 1 time on Alice's remote audio track from Bob
-    When Bob unmutes audio awaits it completes
+    When Bob unmutes audio and awaits it completes
     Then `on_unmuted` callback fires 1 time on Alice's remote audio track from Bob

@@ -43,19 +43,17 @@ impl Builder {
         self,
         room: Object<Room>,
         window: Window,
+        send_state: HashMap<(MediaKind, MediaSourceKind), bool>,
+        recv_state: HashMap<(MediaKind, MediaSourceKind), bool>,
     ) -> Result<Member> {
         let connection_store = room.connections_store().await?;
-        let mut media_state = HashMap::new();
-        media_state.insert((MediaKind::Audio, MediaSourceKind::Device), true);
-        media_state.insert((MediaKind::Video, MediaSourceKind::Device), true);
-        media_state.insert((MediaKind::Video, MediaSourceKind::Display), false);
         Ok(Member {
             id: self.id,
             is_send: self.is_send,
             is_recv: self.is_recv,
             is_joined: false,
-            send_state: RefCell::new(media_state.clone()),
-            recv_state: RefCell::new(media_state),
+            send_state: RefCell::new(send_state),
+            recv_state: RefCell::new(recv_state),
             room,
             connection_store,
             window,
@@ -159,7 +157,7 @@ impl Member {
     }
 
     /// Updates [`Member::send_state`].
-    fn update_media_state(
+    pub fn update_send_media_state(
         &self,
         kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
@@ -175,7 +173,7 @@ impl Member {
     }
 
     /// Updates [`Member::recv_state`].
-    fn update_recv_media_state(
+    pub fn update_recv_media_state(
         &self,
         kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
@@ -196,21 +194,13 @@ impl Member {
     /// [`LocalTrack`]: crate::object::local_track::LocalTrack
     /// [`RemoteTrack`]: crate::object::remote_track::RemoteTrack
     #[must_use]
-    pub fn count_of_tracks_between_members(
-        &self,
-        another: &Self,
-    ) -> (u64, u64) {
+    pub fn count_of_tracks_between_members(&self, other: &Self) -> (u64, u64) {
         let send_count = self
             .send_state
             .borrow()
             .iter()
             .filter(|(key, enabled)| {
-                another
-                    .recv_state
-                    .borrow()
-                    .get(key)
-                    .copied()
-                    .unwrap_or(false)
+                other.recv_state.borrow().get(key).copied().unwrap_or(false)
                     && **enabled
             })
             .count() as u64;
@@ -219,12 +209,7 @@ impl Member {
             .borrow()
             .iter()
             .filter(|(key, enabled)| {
-                another
-                    .send_state
-                    .borrow()
-                    .get(key)
-                    .copied()
-                    .unwrap_or(false)
+                other.send_state.borrow().get(key).copied().unwrap_or(false)
                     && **enabled
             })
             .count() as u64;
@@ -240,7 +225,7 @@ impl Member {
         enabled: bool,
         maybe_await: AwaitCompletion,
     ) -> Result<()> {
-        self.update_media_state(kind, source, enabled);
+        self.update_send_media_state(kind, source, enabled);
         if enabled {
             if let Some(kind) = kind {
                 self.room

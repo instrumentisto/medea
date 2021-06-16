@@ -16,7 +16,7 @@ use super::{AwaitCompletion, Error};
 pub struct Room;
 
 /// Representation of a `MediaKind` JS enum.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MediaKind {
     Audio,
     Video,
@@ -50,7 +50,7 @@ impl MediaKind {
 }
 
 /// Representation of a `MediaSourceKind` JS enum.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MediaSourceKind {
     Device,
     Display,
