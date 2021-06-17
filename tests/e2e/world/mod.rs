@@ -112,7 +112,6 @@ impl World {
         builder: MemberBuilder,
     ) -> Result<()> {
         let mut pipeline = HashMap::new();
-
         let mut send_state = HashMap::new();
         let mut recv_state = HashMap::new();
 
