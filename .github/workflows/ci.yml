@@ -52,12 +52,35 @@ jobs:
       - name: Unpack `medea-control-api-mock` Docker image
         run: make docker.untar from-file=image.tar
 
-      - name: Chrome
-        run: make test.e2e browser=chrome up=yes dockerized=yes
-                           tag=build-${{ github.run_number }}
-      - name: Firefox
-        run: make test.e2e browser=firefox up=yes dockerized=yes
-                           tag=build-${{ github.run_number }}
+      - name: Chrome1
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome2
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome3
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome4
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome5
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome6
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome7
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome8
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome9
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
+
+      - name: Chrome10
+        run: make test.e2e browser=chrome up=yes dockerized=yes tag=build-${{ github.run_number }}
 
   ############
   # Building #
