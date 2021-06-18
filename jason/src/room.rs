@@ -1644,8 +1644,8 @@ impl EventHandler for InnerRoom {
 
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
-        for id in &peer_ids {
-            self.peers.state().remove(*id);
+        for id in peer_ids {
+            self.peers.state().remove(id);
         }
         Ok(())
     }
