@@ -37,7 +37,8 @@
 //! 2. Implement your changing logic in the [`PeerChangeHandler`]
 //!    implementation.
 //! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
-//!    your change by adding it into the [`Context::peer_changes_queue`].
+//!    your change by adding it into the `peer_changes_queue` of the
+//!    [`Context`].
 //!
 //! # Applying changes regardless of [`Peer`] state
 //!
@@ -576,7 +577,7 @@ impl PeerChange {
 impl<T> PeerChangeHandler for Peer<T> {
     type Output = PeerChange;
 
-    /// Inserts provided [`MediaTrack`] into [`Context::senders`].
+    /// Inserts provided [`MediaTrack`] into the `senders` of this [`Context`].
     #[inline]
     fn on_add_send_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
         self.context.senders.insert(track.id(), Rc::clone(&track));
@@ -584,7 +585,8 @@ impl<T> PeerChangeHandler for Peer<T> {
         PeerChange::AddSendTrack(track)
     }
 
-    /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
+    /// Inserts provided [`MediaTrack`] into the `receivers` of this
+    /// [`Context`].
     #[inline]
     fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
         self.context.receivers.insert(track.id(), Rc::clone(&track));
@@ -655,7 +657,7 @@ impl<T> PeerChangeHandler for Peer<T> {
         PeerChange::RemoveTrack(track_id)
     }
 
-    /// Sets [`Context::ice_restart`] flag to `true`.
+    /// Sets the `ice_restart` flag of this [`Context`] to `true`.
     #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
         self.context.ice_restart = true;
@@ -1217,7 +1219,7 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Resets [`Context::local_sdp`] and [`Context::remote_sdp`].
+    /// Resets the `local_sdp` and the `remote_sdp` of this [`Context`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
@@ -1238,7 +1240,7 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Resets [`Context::local_sdp`] and [`Context::remote_sdp`].
+    /// Resets the `local_sdp` and the `remote_sdp` of this [`Context`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
