@@ -307,10 +307,9 @@ where
     /// Sends all values of a dropped [`HashSet`] to the
     /// [`HashSet::on_remove()`] subscriptions.
     fn drop(&mut self) {
-        let store = &mut self.store;
-        let on_remove_subs = &self.on_remove_subs;
-        for value in store.drain() {
-            on_remove_subs.send_update(value);
+        let store = std::mem::take(&mut self.store);
+        for val in store {
+            self.on_remove_subs.send_update(val);
         }
     }
 }

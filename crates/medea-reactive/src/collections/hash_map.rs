@@ -355,9 +355,9 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
     /// Sends all key-values of a dropped [`HashMap`] to the
     /// [`HashMap::on_remove`] subs.
     fn drop(&mut self) {
-        let mut store = std::mem::take(&mut self.store);
-        for (key, value) in store.drain() {
-            self.on_remove_subs.send_update((key, value));
+        let store = std::mem::take(&mut self.store);
+        for (k, v) in store {
+            self.on_remove_subs.send_update((k, v));
         }
     }
 }
