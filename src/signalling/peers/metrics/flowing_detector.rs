@@ -703,7 +703,6 @@ impl PeerStat {
 
     /// Returns last update time of the tracks with provided [`MediaDirection`]
     /// and [`MediaType`].
-    #[allow(clippy::manual_filter_map)]
     fn get_tracks_last_update(
         &self,
         direction: MediaDirection,

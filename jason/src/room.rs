@@ -1213,7 +1213,6 @@ impl InnerRoom {
     /// [`MediaKind`] in all [`PeerConnection`]s of this [`Room`].
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
-    #[allow(clippy::manual_filter_map)]
     async fn toggle_media_state(
         &self,
         state: MediaState,
@@ -1243,7 +1242,6 @@ impl InnerRoom {
     /// [`PeerId`] and [`TrackId`] to the provided [`MediaState`]s.
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
-    #[allow(clippy::manual_filter_map)]
     async fn update_media_states(
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
