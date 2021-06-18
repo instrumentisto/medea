@@ -1464,7 +1464,7 @@ impl<'a> PeerChangesScheduler<'a> {
 
     /// Removes [`Track`]s with a provided [`TrackId`]s from this [`Peer`].
     pub fn remove_tracks(&mut self, track_ids: &[TrackId]) {
-        track_ids.iter().for_each(|id| {
+        for id in track_ids {
             let changes_indexes_to_remove: Vec<_> = self
                 .context
                 .peer_changes_queue
@@ -1489,7 +1489,7 @@ impl<'a> PeerChangesScheduler<'a> {
                     self.context.peer_changes_queue.remove(remove_index);
                 }
             }
-        });
+        }
     }
 }
 

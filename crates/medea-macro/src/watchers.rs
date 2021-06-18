@@ -24,7 +24,7 @@ use syn::{
 pub fn expand(mut input: ItemImpl) -> Result<TokenStream> {
     let component_ty = input.self_ty.clone();
 
-    #[allow(clippy::filter_map)]
+    #[allow(clippy::manual_filter_map)]
     let watchers = input
         .items
         .iter_mut()

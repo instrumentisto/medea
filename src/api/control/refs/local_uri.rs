@@ -347,7 +347,7 @@ mod specs {
 
     #[test]
     fn properly_serialize() {
-        for local_uri_str in &[
+        for local_uri_str in [
             "local://room_id",
             "local://room_id/member_id",
             "local://room_id/member_id/endpoint_id",
@@ -361,7 +361,7 @@ mod specs {
 
     #[test]
     fn return_error_when_local_uri_not_full() {
-        for local_uri_str in &[
+        for local_uri_str in [
             "local://room_id//endpoint_id",
             "local:////endpoint_id",
             "local:///member_id/endpoint_id",

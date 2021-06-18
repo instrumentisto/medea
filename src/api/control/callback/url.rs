@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn successful_parse_grpc_url() {
-        for (url, expected_callback_url) in &[
+        for (url, expected_callback_url) in [
             ("grpc://127.0.0.1:9090", "http://127.0.0.1:9090"),
             ("grpc://example.com:9090", "http://example.com:9090"),
             ("grpc://example.com", "http://example.com"),
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn error_on_unsupported_scheme() {
-        for url in &[
+        for url in [
             "asdf://example.com:9090",
             "asdf://127.0.0.1",
             "asdf://127.0.0.1:9090",
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn error_on_url_without_scheme() {
-        for url in &[
+        for url in [
             "127.0.0.1",
             "127.0.0.1:9090",
             "example.com",

@@ -3,7 +3,6 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    ops::Deref as _,
     rc::{Rc, Weak},
 };
 
@@ -834,10 +833,8 @@ impl Room {
                 if let Some(inner) = inner.upgrade() {
                     match event {
                         RoomEvent::RpcEvent(event) => {
-                            if let Err(e) = event
-                                .dispatch_with(inner.deref())
-                                .await
-                                .map_err(
+                            if let Err(e) =
+                                event.dispatch_with(&*inner).await.map_err(
                                     tracerr::map_from_and_wrap!(=> RoomError),
                                 )
                             {
@@ -845,10 +842,8 @@ impl Room {
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(e) = event
-                                .dispatch_with(inner.deref())
-                                .await
-                                .map_err(
+                            if let Err(e) =
+                                event.dispatch_with(&*inner).await.map_err(
                                     tracerr::map_from_and_wrap!(=> RoomError),
                                 )
                             {
@@ -1018,7 +1013,7 @@ impl ConstraintsUpdateException {
             | Self::Recovered { recover_reason, .. } => {
                 Some(recover_reason.clone())
             }
-            _ => None,
+            Self::Errored(_) => None,
         }
     }
 
@@ -1218,7 +1213,7 @@ impl InnerRoom {
     /// [`MediaKind`] in all [`PeerConnection`]s of this [`Room`].
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
-    #[allow(clippy::filter_map)]
+    #[allow(clippy::manual_filter_map)]
     async fn toggle_media_state(
         &self,
         state: MediaState,
@@ -1248,7 +1243,7 @@ impl InnerRoom {
     /// [`PeerId`] and [`TrackId`] to the provided [`MediaState`]s.
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
-    #[allow(clippy::filter_map)]
+    #[allow(clippy::manual_filter_map)]
     async fn update_media_states(
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
@@ -1392,18 +1387,14 @@ impl InnerRoom {
         source_kind: Option<proto::MediaSourceKind>,
         state: MediaState,
     ) -> bool {
-        self.peers
-            .get_all()
-            .into_iter()
-            .find(|p| {
-                !p.is_all_transceiver_sides_in_media_state(
-                    kind,
-                    direction,
-                    source_kind,
-                    state,
-                )
-            })
-            .is_none()
+        !self.peers.get_all().into_iter().any(|p| {
+            !p.is_all_transceiver_sides_in_media_state(
+                kind,
+                direction,
+                source_kind,
+                state,
+            )
+        })
     }
 
     /// Updates [`MediaState`]s to the provided `states_update` and disables all
@@ -1655,9 +1646,9 @@ impl EventHandler for InnerRoom {
 
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
-        peer_ids.iter().for_each(|id| {
+        for id in &peer_ids {
             self.peers.state().remove(*id);
-        });
+        }
         Ok(())
     }
 

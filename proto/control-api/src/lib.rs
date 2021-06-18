@@ -4,7 +4,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
-#![forbid(unsafe_code)]
+#![forbid(unsafe_code, non_ascii_idents)]
 
 #[cfg(feature = "grpc")]
 pub mod grpc;

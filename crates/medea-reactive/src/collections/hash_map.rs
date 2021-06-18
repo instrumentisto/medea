@@ -356,9 +356,9 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
     /// [`HashMap::on_remove`] subs.
     fn drop(&mut self) {
         let mut store = std::mem::take(&mut self.store);
-        store.drain().for_each(|(key, value)| {
+        for (key, value) in store.drain() {
             self.on_remove_subs.send_update((key, value));
-        });
+        }
     }
 }
 

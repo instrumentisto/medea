@@ -309,9 +309,9 @@ where
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
-        store.drain().for_each(|value| {
+        for value in store.drain() {
             on_remove_subs.send_update(value);
-        });
+        }
     }
 }
 

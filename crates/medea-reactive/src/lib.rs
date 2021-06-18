@@ -9,7 +9,7 @@
     trivial_casts,
     trivial_numeric_casts
 )]
-#![forbid(unsafe_code)]
+#![forbid(unsafe_code, non_ascii_idents)]
 #![warn(
     deprecated_in_future,
     missing_copy_implementations,

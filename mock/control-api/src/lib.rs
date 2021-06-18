@@ -4,6 +4,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 #![allow(clippy::module_name_repetitions)]
+#![forbid(unsafe_code, non_ascii_idents)]
 
 pub mod api;
 pub mod callback;
