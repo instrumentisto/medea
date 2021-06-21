@@ -66,20 +66,6 @@ pub enum UpdateLocalStreamError {
     /// Errors returned from the [`MediaConnections::insert_local_tracks()`]
     /// method.
     InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
-
-    /// Requested state transition is not allowed by [`Sender`]'s settings.
-    ProhibitedState(ProhibitedState),
-
-    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
-    /// to the requested [`MediaState`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(
-        fmt = "MediaState of Sender transits into opposite ({})  to the \
-                requested MediaExchangeState",
-        _0
-    )]
-    TransitionIntoOppositeState(MediaState),
 }
 
 /// Events emitted from a [`Sender`] or a [`Receiver`].
@@ -300,11 +286,8 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`PeerError::RtcPeerConnection`] if
+    /// Errors with [`RtcPeerConnectionError::PeerCreationError`] if
     /// [`platform::RtcPeerConnection`] creating fails.
-    ///
-    /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
-    /// [`platform::RtcPeerConnection`] can't be set.
     pub fn new(
         state: &State,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -683,25 +666,17 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`TracksRequestError`] if current state of peer's [`Sender`]s
-    /// cannot be represented as [`SimpleTracksRequest`] (max 1 audio [`Sender`]
-    /// and max 1 video [`Sender`]), or [`local::Track`]s requested from
-    /// [`MediaManager`] does not satisfy [`Sender`]s constraints.
+    /// With [`UpdateLocalStreamError::InvalidLocalTracks`] if current state of
+    /// peer's [`Sender`]s cannot be represented as [`SimpleTracksRequest`]
+    /// (max 1 audio [`Sender`] and max 2 video [`Sender`]s), or
+    /// [`local::Track`]s requested from [`MediaManager`] does not satisfy
+    /// [`Sender`]'s constraints.
     ///
-    /// With [`TracksRequestError::ExpectedAudioTracks`] or
-    /// [`TracksRequestError::ExpectedDeviceVideoTracks`] /
-    /// [`TracksRequestError::ExpectedDisplayVideoTracks`] if provided
-    /// [`MediaStreamSettings`] are incompatible with this peer [`Sender`]s
-    /// constraints.
+    /// With [`UpdateLocalStreamError::CouldNotGetLocalMedia`] if
+    /// [`local::Track`]s could not be obtained from the UA.
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] or
-    /// [`MediaManagerError::GetDisplayMediaFailed`] if corresponding request to
-    /// UA failed.
-    ///
-    /// With [`MediaConnectionsError::NotEnoughTracks`],
-    /// [`MediaConnectionsError::InvalidMediaTrack`] or
-    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
-    /// [`local::Track`] couldn't inserted into [`PeerConnection`]s [`Sender`]s.
+    /// With [`UpdateLocalStreamError::InvalidLocalTracks`] if [`local::Track`]s
+    /// couldn't inserted into [`PeerConnection`]s [`Sender`]s.
     ///
     /// [`Sender`]: sender::Sender
     /// [1]: https://w3.org/TR/mediacapture-streams#mediastream
@@ -731,7 +706,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`PeerError::TracksRequest`] if failed to create or merge
+    /// Errors with [`TracksRequestError`] if failed to create or merge
     /// [`SimpleTracksRequest`].
     pub fn get_media_settings(
         &self,
@@ -756,7 +731,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`PeerError::TracksRequest`] if failed to create or merge
+    /// Errors with [`TracksRequestError`] if failed to create or merge
     /// [`SimpleTracksRequest`].
     fn get_simple_tracks_request(
         &self,

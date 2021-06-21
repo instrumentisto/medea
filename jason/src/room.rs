@@ -105,26 +105,6 @@ impl RoomCloseReason {
     }
 }
 
-/// Errors that may occur in a [`Room`].
-#[derive(Clone, Debug, Display)]
-enum RoomEventHandlerError {
-    /// Returned if the requested [`PeerConnection`] is not found.
-    #[display(fmt = "Peer with id {} doesnt exist", _0)]
-    NoSuchPeer(PeerId),
-
-    /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
-    /// connection with remote `Member`.
-    #[display(fmt = "Remote stream from unknown member")]
-    UnknownRemoteMember,
-}
-
-macro_rules! upgrade_inner {
-    ($v:expr) => {
-        $v.upgrade()
-            .ok_or_else(|| tracerr::new!(HandleDetachedError))
-    };
-}
-
 /// External handle to a [`Room`].
 #[derive(Clone)]
 pub struct RoomHandle(Weak<InnerRoom>);
@@ -169,6 +149,8 @@ pub enum ChangeMediaStateError {
     Detached,
 
     /// Errors that may occur when validating [`TracksRequest`].
+    ///
+    /// [`TracksRequest`]: peer::TracksRequest
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
@@ -214,8 +196,6 @@ impl From<UpdateLocalStreamError> for ChangeMediaStateError {
             UpdateErr::InvalidLocalTracks(e) => Self::from(e),
             UpdateErr::CouldNotGetLocalMedia(e) => Self::from(e),
             UpdateErr::InsertLocalTracksError(e) => Self::from(e),
-            UpdateErr::ProhibitedState(e) => Self::from(e),
-            UpdateErr::TransitionIntoOppositeState(e) => Self::from(e),
         }
     }
 }
@@ -226,12 +206,21 @@ impl From<UpdateLocalStreamError> for ChangeMediaStateError {
 #[js(error = "platform::Error")]
 pub enum GetLocalTracksError {
     /// Errors that may occur when validating [`TracksRequest`].
+    ///
+    /// [`TracksRequest`]: peer::TracksRequest
     #[display(fmt = "Room is in detached state")]
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
     #[display(fmt = "Room is in detached state")]
     CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
+}
+
+macro_rules! upgrade_inner {
+    ($v:expr) => {
+        $v.upgrade()
+            .ok_or_else(|| tracerr::new!(HandleDetachedError))
+    };
 }
 
 impl RoomHandle {
@@ -247,15 +236,15 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
-    /// `on_connection_loss` callback is not set.
+    /// With [`RoomJoinError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
-    /// With [`RoomError::ConnectionInfoParse`] if the provided URL parsing
+    /// With [`RoomJoinError::ConnectionInfoParse`] if the provided URL parsing
     /// fails.
     ///
-    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`RoomJoinError::CallbackNotSet`] if `on_failed_local_media` or
+    /// `on_connection_loss` callback is not set.
     ///
-    /// With [`RoomError::SessionError`] when unable to connect to a media
+    /// With [`RoomJoinError::SessionError`] when unable to connect to a media
     /// server.
     pub async fn join(&self, url: String) -> Result<(), Traced<RoomJoinError>> {
         let inner = self
@@ -291,7 +280,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
     ///
     /// [`Connection`]: crate::connection::Connection
     pub fn on_new_connection(
@@ -307,7 +296,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
     pub fn on_close(
         &self,
         f: platform::Function<api::RoomCloseReason>,
@@ -325,7 +314,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
     pub fn on_local_track(
         &self,
         f: platform::Function<api::LocalMediaTrack>,
@@ -338,7 +327,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
     pub fn on_failed_local_media(
         &self,
         f: platform::Function<api::JasonError>,
@@ -352,7 +341,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
     pub fn on_connection_loss(
         &self,
         f: platform::Function<api::ReconnectHandle>,
@@ -385,13 +374,13 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConstraintsUpdateException::Errored`] if and error has occurred
-    /// while applying the provided [`MediaStreamSettings`].
+    /// With [`ConstraintsUpdateError::Errored`] if and error has occurred while
+    /// applying the provided [`MediaStreamSettings`].
     ///
-    /// With [`ConstraintsUpdateException::Recovered`] if
-    /// [`MediaStreamSettings`] are rolled-back because an error had occurred.
+    /// With [`ConstraintsUpdateError::Recovered`] if [`MediaStreamSettings`]
+    /// are rolled-back because an error had occurred.
     ///
-    /// With [`ConstraintsUpdateException::RecoverFailed`] if
+    /// With [`ConstraintsUpdateError::RecoverFailed`] if
     /// [`MediaStreamSettings`] rollback failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -400,15 +389,16 @@ impl RoomHandle {
         settings: MediaStreamSettings,
         stop_first: bool,
         rollback_on_fail: bool,
-    ) -> Result<(), ConstraintsUpdateException> {
-        let inner = (self.0)
-            .upgrade()
-            .ok_or(ConstraintsUpdateException::Detached)?;
+    ) -> Result<(), ConstraintsUpdateError> {
+        let inner = (self.0).upgrade().ok_or_else(|| {
+            ConstraintsUpdateError::errored(tracerr::new!(
+                ChangeMediaStateError::Detached
+            ))
+        })?;
 
         inner
             .set_local_media_settings(settings, stop_first, rollback_on_fail)
             .await
-            .map_err(ConstraintsUpdateException::from)
     }
 
     /// Changes [`MediaState`] of the provided [`MediaKind`], [`TrackDirection`]
@@ -499,10 +489,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::unmute_audio()`] was called while muting or a media server
     /// didn't approve this state transition.
     #[inline]
@@ -523,11 +513,11 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::mute_audio`] was called while muting or a media server
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
+    /// [`RoomHandle::mute_audio()`] was called while muting or a media server
     /// didn't approve this state transition.
     #[inline]
     pub async fn unmute_audio(
@@ -547,10 +537,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::unmute_video()`] was called while muting or a media server
     /// didn't approve this state transition.
     #[inline]
@@ -572,10 +562,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::mute_video()`] was called while muting or a media server
     /// didn't approve this state transition.
     #[inline]
@@ -597,14 +587,13 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`] if audio track's
+    /// With [`ChangeMediaStateError::ProhibitedState`] if audio track's
     /// sender is configured as `required`.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::enable_audio()`] was called while disabling or a media
     /// server didn't approve this state transition.
     #[inline]
@@ -625,16 +614,15 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::disable_audio`] was called while enabling or a media
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
+    /// [`RoomHandle::disable_audio()`] was called while enabling or a media
     /// server didn't approve this state transition.
     ///
-    /// With [`RoomError::MediaManagerError`] with
-    /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
-    /// failed.
+    /// With [`ChangeMediaStateError::CouldNotGetLocalMedia`] if media
+    /// acquisition request failed.
     #[inline]
     pub async fn enable_audio(
         &self,
@@ -655,14 +643,13 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`] video track's
+    /// With [`ChangeMediaStateError::ProhibitedState`] video track's
     /// sender is configured as `required`.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::enable_video()`] was called while disabling or a media
     /// server didn't approve this state transition.
     #[inline]
@@ -686,16 +673,15 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::disable_video()`] was called while enabling or a media
     /// server didn't approve this state transition.
     ///
-    /// With [`RoomError::MediaManagerError`] with
-    /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
-    /// failed.
+    /// With [`ChangeMediaStateError::CouldNotGetLocalMedia`] if media
+    /// acquisition request failed.
     #[inline]
     pub async fn enable_video(
         &self,
@@ -715,10 +701,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::enable_remote_audio()`] was called while disabling or a
     /// media server didn't approve this state transition.
     #[inline]
@@ -739,10 +725,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::enable_remote_video()`] was called while disabling or a
     /// media server didn't approve this state transition.
     #[inline]
@@ -763,10 +749,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::disable_remote_audio()`] was called while enabling or a
     /// media server didn't approve this state transition.
     #[inline]
@@ -787,10 +773,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
+    /// upgrade fails.
     ///
-    /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::disable_remote_video()`] was called while enabling or a
     /// media server didn't approve this state transition.
     #[inline]
@@ -1005,55 +991,49 @@ struct InnerRoom {
     close_reason: RefCell<CloseReason>,
 }
 
-/// Exception for a [`RoomHandle::set_local_media_settings`].
+/// Error for the [`RoomHandle::set_local_media_settings`].
 #[derive(Debug, Display)]
-pub enum ConstraintsUpdateException {
-    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "RecoveredException")]
-    Detached,
-
+pub enum ConstraintsUpdateError {
     /// New [`MediaStreamSettings`] set failed and state was recovered
     /// accordingly to the provided recover policy
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
     Recovered {
-        /// [`UpdateLocalStreamError`] due to which recovery has happened.
-        recover_reason: Traced<UpdateLocalStreamError>,
+        /// [`ChangeMediaStateError`] due to which recovery happened.
+        recover_reason: Traced<ChangeMediaStateError>,
     },
 
     /// New [`MediaStreamSettings`] set failed and state recovering also
     /// failed.
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
-        /// [`UpdateLocalStreamError`] due to which recovery has happened.
-        recover_reason: Traced<UpdateLocalStreamError>,
+        /// [`ChangeMediaStateError`] due to which recovery happened.
+        recover_reason: Traced<ChangeMediaStateError>,
 
-        /// Vector of [`UpdateLocalStreamError`]s due to which recovery has
-        /// failed.
-        recover_fail_reasons: Vec<Traced<UpdateLocalStreamError>>,
+        /// [`ChangeMediaStateError`]s due to which recovery failed.
+        recover_fail_reasons: Vec<Traced<ChangeMediaStateError>>,
     },
 
-    /// Some other error occurred.
+    /// Indicates that some error occurred.
     #[display(fmt = "ErroredException")]
-    Errored(Traced<UpdateLocalStreamError>),
+    Errored(Traced<ChangeMediaStateError>),
 }
 
-impl ConstraintsUpdateException {
-    /// Returns name of this [`ConstraintsUpdateException`].
+impl ConstraintsUpdateError {
+    /// Returns name of this [`ConstraintsUpdateError`].
     #[inline]
     #[must_use]
     pub fn name(&self) -> String {
         self.to_string()
     }
 
-    /// Returns a [`UpdateLocalStreamError`] if this
-    /// [`ConstraintsUpdateException`] represents a `RecoveredException` or
-    /// a `RecoverFailedException`.
+    /// Returns a [`UpdateLocalStreamError`] if this [`ConstraintsUpdateError`]
+    /// represents a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
     #[inline]
     #[must_use]
-    pub fn recover_reason(&self) -> Option<Traced<UpdateLocalStreamError>> {
+    pub fn recover_reason(&self) -> Option<Traced<ChangeMediaStateError>> {
         match &self {
             Self::RecoverFailed { recover_reason, .. }
             | Self::Recovered { recover_reason, .. } => {
@@ -1067,7 +1047,7 @@ impl ConstraintsUpdateException {
     /// has failed.
     #[inline]
     #[must_use]
-    pub fn recover_fail_reasons(&self) -> Vec<Traced<UpdateLocalStreamError>> {
+    pub fn recover_fail_reasons(&self) -> Vec<Traced<ChangeMediaStateError>> {
         match &self {
             Self::RecoverFailed {
                 recover_fail_reasons,
@@ -1077,60 +1057,30 @@ impl ConstraintsUpdateException {
         }
     }
 
-    /// Returns a [`UpdateLocalStreamError`] if this
-    /// [`ConstraintsUpdateException`] represents an `ErroredException`.
+    /// Returns a [`UpdateLocalStreamError`] if this [`ConstraintsUpdateError`]
+    /// represents an `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
     #[inline]
     #[must_use]
-    pub fn error(&self) -> Option<Traced<UpdateLocalStreamError>> {
+    pub fn error(&self) -> Option<Traced<ChangeMediaStateError>> {
         match &self {
-            Self::Errored(reason) => Some(reason.clone()),
+            Self::Errored(error) => Some(error.clone()),
             _ => None,
         }
     }
-}
 
-/// Constraints errors which are can occur while updating
-/// [`MediaStreamSettings`] by [`InnerRoom::set_local_media_settings`] call.
-#[derive(Debug)]
-enum ConstraintsUpdateError {
-    /// New [`MediaStreamSettings`] set failed and state was recovered
-    /// accordingly to the provided recover policy
-    /// (`rollback_on_fail`/`stop_first` arguments).
-    Recovered {
-        /// [`RoomError`] due to which recovery happened.
-        recover_reason: Traced<UpdateLocalStreamError>,
-    },
-
-    /// New [`MediaStreamSettings`] set failed and state recovering also
-    /// failed.
-    RecoverFailed {
-        /// [`RoomError`] due to which recovery happened.
-        recover_reason: Traced<UpdateLocalStreamError>,
-
-        /// [`RoomError`]s due to which recovery failed.
-        recover_fail_reasons: Vec<Traced<UpdateLocalStreamError>>,
-    },
-
-    /// Indicates that some error occurred.
-    Errored {
-        error: Traced<UpdateLocalStreamError>,
-    },
-}
-
-impl ConstraintsUpdateError {
     /// Returns new [`ConstraintsUpdateError::Recovered`].
-    pub fn recovered(recover_reason: Traced<UpdateLocalStreamError>) -> Self {
+    #[inline]
+    #[must_use]
+    fn recovered(recover_reason: Traced<ChangeMediaStateError>) -> Self {
         Self::Recovered { recover_reason }
     }
 
     /// Converts this [`ConstraintsUpdateError`] to the
     /// [`ConstraintsUpdateError::RecoverFailed`].
-    pub fn recovery_failed(
-        self,
-        reason: Traced<UpdateLocalStreamError>,
-    ) -> Self {
+    #[must_use]
+    fn recovery_failed(self, reason: Traced<ChangeMediaStateError>) -> Self {
         match self {
             Self::Recovered { recover_reason } => Self::RecoverFailed {
                 recover_reason: reason,
@@ -1147,7 +1097,7 @@ impl ConstraintsUpdateError {
                     recover_fail_reasons,
                 }
             }
-            Self::Errored { error } => Self::RecoverFailed {
+            Self::Errored(error) => Self::RecoverFailed {
                 recover_reason: error,
                 recover_fail_reasons: vec![reason],
             },
@@ -1155,34 +1105,10 @@ impl ConstraintsUpdateError {
     }
 
     /// Returns [`ConstraintsUpdateError::Errored`] with a provided parameter.
-    pub fn errored(reason: Traced<UpdateLocalStreamError>) -> Self {
-        Self::Errored { error: reason }
-    }
-}
-
-impl From<ConstraintsUpdateError> for ConstraintsUpdateException {
-    fn from(from: ConstraintsUpdateError) -> Self {
-        use ConstraintsUpdateError as E;
-        match from {
-            E::Recovered { recover_reason } => Self::Recovered {
-                recover_reason: tracerr::new!(recover_reason),
-            },
-            E::RecoverFailed {
-                recover_reason,
-                recover_fail_reasons,
-            } => Self::RecoverFailed {
-                recover_reason: tracerr::new!(recover_reason),
-                recover_fail_reasons: {
-                    recover_fail_reasons
-                        .into_iter()
-                        .map(tracerr::map_from_and_wrap!())
-                        .collect()
-                },
-            },
-            E::Errored { error: reason } => {
-                Self::Errored(tracerr::new!(reason))
-            }
-        }
+    #[inline]
+    #[must_use]
+    fn errored(error: Traced<ChangeMediaStateError>) -> Self {
+        Self::Errored(error)
     }
 }
 
@@ -1272,7 +1198,7 @@ impl InnerRoom {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<proto::MediaSourceKind>,
-    ) -> Result<(), Traced<UpdateLocalStreamError>> {
+    ) -> Result<(), Traced<ChangeMediaStateError>> {
         let tracks: HashMap<_, _> = self
             .peers
             .get_all()
@@ -1298,7 +1224,7 @@ impl InnerRoom {
     async fn update_media_states(
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
-    ) -> Result<(), Traced<UpdateLocalStreamError>> {
+    ) -> Result<(), Traced<ChangeMediaStateError>> {
         let stream_upd_sub: HashMap<PeerId, HashSet<TrackId>> = desired_states
             .iter()
             .map(|(id, states)| {
@@ -1382,10 +1308,11 @@ impl InnerRoom {
     ///
     /// # Errors
     ///
-    /// - [`RoomError::MediaManagerError`] if failed to obtain a
-    ///   [`local::Track`] from the [`MediaManager`].
-    /// - [`RoomError::PeerConnectionError`] if failed to get
-    ///   [`MediaStreamSettings`].
+    /// With [`GetLocalTracksError::CouldNotGetLocalMedia`] if failed to obtain
+    /// [`local::Track`]s from the [`MediaManager`].
+    ///
+    /// With[`GetLocalTracksError::InvalidLocalTracks`] if failed to get
+    /// [`MediaStreamSettings`].
     async fn get_local_tracks(
         &self,
         kind: MediaKind,
@@ -1460,7 +1387,7 @@ impl InnerRoom {
         peer: &Rc<PeerConnection>,
         kinds: LocalStreamUpdateCriteria,
         mut states_update: HashMap<PeerId, HashMap<TrackId, MediaState>>,
-    ) -> Result<(), Traced<UpdateLocalStreamError>> {
+    ) -> Result<(), Traced<ChangeMediaStateError>> {
         use media_exchange_state::Stable::Disabled;
 
         self.send_constraints
@@ -1616,6 +1543,19 @@ impl InnerRoom {
             state: self.peers.state().as_proto(),
         });
     }
+}
+
+/// Errors that may occur in a [`Room`].
+#[derive(Clone, Debug, Display)]
+enum RoomEventHandlerError {
+    /// Returned if the requested [`PeerConnection`] is not found.
+    #[display(fmt = "Peer with id {} doesnt exist", _0)]
+    NoSuchPeer(PeerId),
+
+    /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
+    /// connection with remote `Member`.
+    #[display(fmt = "Remote stream from unknown member")]
+    UnknownRemoteMember,
 }
 
 /// RPC events handling.

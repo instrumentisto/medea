@@ -75,6 +75,8 @@ impl<S> TracksRepository<S> {
     }
 
     /// Returns a [`Stream`] streaming all the [`TracksRepository::remove`]s.
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(
         &self,

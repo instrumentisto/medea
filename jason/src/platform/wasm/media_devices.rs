@@ -20,9 +20,8 @@ use super::window;
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::EnumerateDevicesFailed`] if
-/// [MediaDevices.enumerateDevices()][1] returns error or couldn't get
-/// [MediaDevices][2].
+/// With [`Error`] if [MediaDevices.enumerateDevices()][1] returns error or
+/// couldn't get [MediaDevices][2].
 ///
 /// # Panics
 ///
@@ -65,9 +64,8 @@ pub async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>, Traced<Error>>
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::GetUserMediaFailed`] if
-/// [MediaDevices.getUserMedia()][1] returns error or couldn't get
-/// [MediaDevices][2].
+/// With [`Error`] if [MediaDevices.getUserMedia()][1] returns error or couldn't
+/// get [MediaDevices][2].
 ///
 /// # Panics
 ///
@@ -111,9 +109,8 @@ pub async fn get_user_media(
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::GetUserMediaFailed`] if
-/// [MediaDevices.getDisplayMedia()][1] returns error or couldn't get
-/// [MediaDevices][2]..
+/// With [`Error`] if [MediaDevices.getDisplayMedia()][1] returns error or
+/// couldn't get [MediaDevices][2]..
 ///
 /// # Panics
 ///

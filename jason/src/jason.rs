@@ -101,7 +101,7 @@ impl Jason {
     }
 
     /// Returns a [`RoomHandle`] for an initialized  [`Room`].
-    pub fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
+    fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
         let on_normal_close = rpc.on_normal_close();
         let room = Room::new(rpc, Rc::clone(&self.0.borrow().media_manager));
 

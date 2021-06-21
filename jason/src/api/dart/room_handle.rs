@@ -12,9 +12,11 @@ use crate::{
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
-    peer::PeerError,
     platform,
-    room::RoomError,
+    room::{
+        ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
+        RoomJoinError,
+    },
 };
 
 use super::{utils::DartError, MediaStreamSettings};
@@ -26,31 +28,41 @@ pub use crate::room::RoomHandle;
 
 impl ForeignClass for RoomHandle {}
 
-impl From<Traced<RoomError>> for DartError {
+impl From<Traced<HandleDetachedError>> for DartError {
     #[inline]
-    fn from(err: Traced<RoomError>) -> Self {
+    fn from(_: Traced<HandleDetachedError>) -> Self {
+        StateError::new("ReconnectHandle is in detached state.").into()
+    }
+}
+
+impl From<Traced<RoomJoinError>> for DartError {
+    #[inline]
+    fn from(_: Traced<RoomJoinError>) -> Self {
+        todo!()
+    }
+}
+
+impl From<Traced<ChangeMediaStateError>> for DartError {
+    #[inline]
+    fn from(err: Traced<ChangeMediaStateError>) -> Self {
         match err.into_inner() {
-            RoomError::CallbackNotSet(_)
-            | RoomError::InvalidLocalTracks(_)
-            | RoomError::CouldNotGetLocalMedia(_)
-            | RoomError::NoSuchPeer(_)
-            | RoomError::PeerConnectionError(_)
-            | RoomError::UnknownRemoteMember
-            | RoomError::FailedTrackPatch(_)
-            | RoomError::MediaConnections(_)
-            | RoomError::SessionError(_)
-            | RoomError::ConnectionInfoParse(_) => {
-                todo!()
-            }
-            RoomError::Detached => {
+            ChangeMediaStateError::Detached => {
                 StateError::new("RoomHandle is in detached state.").into()
+            }
+            ChangeMediaStateError::InvalidLocalTracks(_)
+            | ChangeMediaStateError::CouldNotGetLocalMedia(_)
+            | ChangeMediaStateError::InsertLocalTracksError(_)
+            | ChangeMediaStateError::ProhibitedState(_)
+            | ChangeMediaStateError::TransitionIntoOppositeState(_) => {
+                todo!()
             }
         }
     }
 }
 
-impl From<Traced<PeerError>> for DartError {
-    fn from(_err: Traced<PeerError>) -> Self {
+impl From<Traced<ConstraintsUpdateError>> for DartError {
+    #[inline]
+    fn from(_: Traced<ConstraintsUpdateError>) -> Self {
         todo!()
     }
 }
@@ -67,7 +79,7 @@ impl From<Traced<PeerError>> for DartError {
 pub unsafe extern "C" fn RoomHandle__join(
     this: ptr::NonNull<RoomHandle>,
     token: ptr::NonNull<libc::c_char>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<RoomJoinError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -109,7 +121,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
     settings: ptr::NonNull<MediaStreamSettings>,
     stop_first: bool,
     rollback_on_fail: bool,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ConstraintsUpdateError>>> {
     let this = this.as_ref().clone();
     let settings = settings.as_ref().clone();
 
@@ -130,7 +142,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -146,7 +158,7 @@ pub unsafe extern "C" fn RoomHandle__mute_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -162,7 +174,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -178,7 +190,7 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -197,7 +209,7 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
     let this = this.as_ref().clone();
@@ -221,7 +233,7 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
     // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
@@ -243,7 +255,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
     // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
@@ -265,7 +277,7 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
     let this = this.as_ref().clone();
@@ -286,7 +298,7 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -302,7 +314,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -318,7 +330,7 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_video(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -334,7 +346,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_video(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture<Result<(), Traced<RoomError>>> {
+) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -435,7 +447,10 @@ mod mock {
         },
         media::MediaSourceKind,
         platform,
-        room::{RoomCloseReason, RoomError},
+        room::{
+            ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
+            RoomCloseReason, RoomJoinError,
+        },
         rpc::{ClientDisconnect, CloseReason},
     };
 
@@ -447,7 +462,7 @@ mod mock {
         pub fn on_new_connection(
             &self,
             cb: platform::Function<ConnectionHandle>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             cb.call1(ConnectionHandle);
             Ok(())
         }
@@ -455,7 +470,7 @@ mod mock {
         pub fn on_close(
             &self,
             cb: platform::Function<RoomCloseReason>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             cb.call1(RoomCloseReason::new(CloseReason::ByClient {
                 is_err: true,
                 reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
@@ -466,7 +481,7 @@ mod mock {
         pub fn on_local_track(
             &self,
             cb: platform::Function<LocalMediaTrack>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             cb.call1(LocalMediaTrack);
             Ok(())
         }
@@ -474,7 +489,7 @@ mod mock {
         pub fn on_connection_loss(
             &self,
             cb: platform::Function<ReconnectHandle>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             cb.call1(ReconnectHandle);
             Ok(())
         }
@@ -482,7 +497,7 @@ mod mock {
         pub async fn join(
             &self,
             _token: String,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<RoomJoinError>> {
             Ok(())
         }
 
@@ -498,30 +513,38 @@ mod mock {
             _settings: MediaStreamSettings,
             _stop_first: bool,
             _rollback_on_fail: bool,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ConstraintsUpdateError>> {
             Ok(())
         }
 
-        pub async fn mute_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn mute_audio(
+            &self,
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
 
-        pub async fn unmute_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn unmute_audio(
+            &self,
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
 
-        pub async fn enable_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn enable_audio(
+            &self,
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
 
-        pub async fn disable_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn disable_audio(
+            &self,
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
 
         pub async fn mute_video(
             &self,
             source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             assert_eq!(source_kind, None);
             Ok(())
         }
@@ -529,7 +552,7 @@ mod mock {
         pub async fn unmute_video(
             &self,
             source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             assert_eq!(source_kind, Some(MediaSourceKind::Display));
             Ok(())
         }
@@ -537,7 +560,7 @@ mod mock {
         pub async fn enable_video(
             &self,
             source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             assert_eq!(source_kind, Some(MediaSourceKind::Device));
             Ok(())
         }
@@ -545,32 +568,32 @@ mod mock {
         pub async fn disable_video(
             &self,
             source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             assert_eq!(source_kind, Some(MediaSourceKind::Display));
             Ok(())
         }
 
         pub async fn enable_remote_audio(
             &self,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
 
         pub async fn disable_remote_audio(
             &self,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
 
         pub async fn enable_remote_video(
             &self,
-        ) -> Result<(), Traced<RoomError>> {
-            Err(tracerr::new!(RoomError::Detached).into())
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
+            Err(tracerr::new!(ChangeMediaStateError::Detached).into())
         }
 
         pub async fn disable_remote_video(
             &self,
-        ) -> Result<(), Traced<RoomError>> {
+        ) -> Result<(), Traced<ChangeMediaStateError>> {
             Ok(())
         }
     }

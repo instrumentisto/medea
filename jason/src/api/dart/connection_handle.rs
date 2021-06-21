@@ -20,7 +20,7 @@ impl ForeignClass for ConnectionHandle {}
 
 impl From<Traced<HandlerDetachedError>> for DartError {
     #[inline]
-    fn from(err: Traced<HandlerDetachedError>) -> Self {
+    fn from(_: Traced<HandlerDetachedError>) -> Self {
         StateError::new("ConnectionHandle is in detached state.").into()
     }
 }
@@ -97,8 +97,7 @@ mod mock {
     use crate::{
         api::RemoteMediaTrack,
         connection::{
-            ConnectionError, ConnectionHandle as CoreConnectionHandle,
-            HandlerDetachedError,
+            ConnectionHandle as CoreConnectionHandle, HandlerDetachedError,
         },
         platform,
     };
@@ -115,7 +114,7 @@ mod mock {
         pub fn get_remote_member_id(
             &self,
         ) -> Result<String, Traced<HandlerDetachedError>> {
-            Err(tracerr::new!(ConnectionError::Detached).into())
+            Err(tracerr::new!(HandlerDetachedError).into())
         }
 
         pub fn on_close(

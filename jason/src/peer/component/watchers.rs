@@ -27,6 +27,7 @@ use super::{Component, PeerConnection, State};
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 enum PeerWatcherError {
+    // TODO: add docs
     RtcPeerConnection(#[js(cause)] RtcPeerConnectionError),
 
     GetMids(GetMidsError),
@@ -34,7 +35,7 @@ enum PeerWatcherError {
     SenderCreateFailed(sender::CreateError),
 }
 
-// TODO: Dont demand spawned watchers to return Result.
+// TODO: Dont force spawned watchers to return Result.
 #[watchers]
 impl Component {
     /// Watcher for the [`State::ice_candidates`] push update.

@@ -6,7 +6,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use derive_more::{Display, From};
+use derive_more::{Display, From, Into};
 use medea_client_api_proto::MediaSourceKind;
 use tracerr::Traced;
 
@@ -22,7 +22,7 @@ use crate::{
 use super::track::local;
 
 /// Errors returned from [`MediaManagerHandle::enumerate_devices()`] method.
-#[derive(Debug, Display, Clone, JsCaused, From)]
+#[derive(Debug, Display, Clone, JsCaused, From, Into)]
 #[js(error = "platform::Error")]
 #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
 pub struct EnumerateDevicesError(platform::Error);
@@ -154,10 +154,10 @@ impl InnerMediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// With [`InitLocalTracksError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.
     ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// With [`InitLocalTracksError::GetDisplayMediaFailed`] if
     /// [getDisplayMedia()][2] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -311,8 +311,8 @@ impl InnerMediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
-    /// the provided [`platform::MediaStreamTrack`]s is in [`ended`][1] state.
+    /// With [`LocalTrackIsEnded`] if at least one track from the provided
+    /// [`platform::MediaStreamTrack`]s is in [`ended`][1] state.
     ///
     /// In case of error all tracks are ended and are not saved in
     /// [`MediaManager`]'s tracks storage.
@@ -354,10 +354,10 @@ impl MediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// With [`InitLocalTracksError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.
     ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// With [`InitLocalTracksError::GetDisplayMediaFailed`] if
     /// [getDisplayMedia()][2] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -404,8 +404,7 @@ impl MediaManagerHandle {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::EnumerateDevicesFailed`] if devices
-    /// enumeration failed.
+    /// With [`EnumerateDevicesError`] if devices enumeration failed.
     pub async fn enumerate_devices(
         &self,
     ) -> Result<Vec<platform::InputDeviceInfo>, Traced<EnumerateDevicesError>>
@@ -420,12 +419,13 @@ impl MediaManagerHandle {
     ///
     /// # Errors
     ///
-    /// With [`err::Detached`] if [`Weak`] pointer upgrade fails.
+    /// With [`InitLocalTracksError::Detached`] if [`Weak`] pointer upgrade
+    /// fails.
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// With [`InitLocalTracksError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.
     ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// With [`InitLocalTracksError::GetDisplayMediaFailed`] if
     /// [getDisplayMedia()][2] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia

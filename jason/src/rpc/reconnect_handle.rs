@@ -80,8 +80,19 @@ impl ReconnectHandle {
     ///
     /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
-    /// With [`ReconnectError::Session`] if error while reconnecting has
-    /// occurred.
+    /// With [`ReconnectError::AuthorizationFailed`] if the new connection was
+    /// declined by server. This usually means that authentication data the
+    /// client provides is obsolete.
+    ///
+    /// With [`ReconnectError::ConnectionLost`] if the new connection could not
+    /// be established. This usually means that some transport error occurred,
+    /// so users can continue performing reconnect attempts.
+    ///
+    /// With [`ReconnectError::SessionFinished`] if connection was closed by
+    /// server, this is a terminal state.
+    ///
+    /// With [`ReconnectError::Internal`] if any internal error occurs. This is
+    /// a programmatic error.
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
@@ -122,8 +133,19 @@ impl ReconnectHandle {
     ///
     /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
-    /// With [`ReconnectError::Session`] if error while reconnecting has
-    /// occurred and `max_elapsed_time_ms` is provided.
+    /// With [`ReconnectError::AuthorizationFailed`] if the new connection was
+    /// declined by server. This usually means that authentication data the
+    /// client provides is obsolete.
+    ///
+    /// With [`ReconnectError::ConnectionLost`] if the new connection could not
+    /// be established. This usually means that some transport error occurred,
+    /// so users can continue performing reconnect attempts.
+    ///
+    /// With [`ReconnectError::SessionFinished`] if connection was closed by
+    /// server, this is a terminal state.
+    ///
+    /// With [`ReconnectError::Internal`] if any internal error occurs. This is
+    /// a programmatic error.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,

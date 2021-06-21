@@ -1889,7 +1889,7 @@ async fn set_media_state_return_media_error() {
         err.message(),
         format!(
             "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-            Unknown JS error: {}",
+             Unknown JS error: {}",
             ERROR_MSG
         )
     );

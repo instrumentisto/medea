@@ -19,7 +19,7 @@ pub use self::{
     },
     manager::{
         EnumerateDevicesError, GetDisplayMediaError, GetUserMediaError,
-        MediaManager, MediaManagerHandle,
+        InitLocalTracksError, MediaManager, MediaManagerHandle,
     },
     track::MediaSourceKind,
 };

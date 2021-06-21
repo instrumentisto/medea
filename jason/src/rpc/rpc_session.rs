@@ -630,6 +630,7 @@ pub enum SessionState {
     Finished(CloseReason),
 }
 
+// TODO: docs
 #[derive(Clone, Debug, Display)]
 pub enum ConnectionLostReason {
     Client(Traced<RpcClientError>),

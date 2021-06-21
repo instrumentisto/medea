@@ -48,7 +48,7 @@ enum LocalTrackState {
 
     /// Indicates that new [`local::Track`] getting is failed.
     ///
-    /// Contains [`PeerError`] with which
+    /// Contains [`UpdateLocalStreamError`] with which
     /// [getUserMedia()][1]/[getDisplayMedia()][2] request was failed.
     ///
     /// [`local::Track`]: crate::media::track::local::Track
@@ -221,11 +221,6 @@ impl From<&State> for proto::state::Sender {
 
 impl State {
     /// Creates new [`State`] with the provided data.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
-    /// [`Sender`] cannot be disabled.
     #[must_use]
     pub fn new(
         id: TrackId,

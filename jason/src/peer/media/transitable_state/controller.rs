@@ -195,9 +195,8 @@ where
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`]
-    /// is returned if [`TransitableStateController`]'s [`MediaState`] transits
-    /// into the opposite to the `desired_state`.
+    /// With approved stable [`MediaState`] if transition to the `desired_state`
+    /// could not be made.
     ///
     /// [`Future`]: std::future::Future
     /// [`MediaState`]: super::MediaState

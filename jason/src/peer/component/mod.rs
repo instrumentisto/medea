@@ -338,11 +338,6 @@ impl State {
     }
 
     /// Inserts the provided [`proto::Track`] to this [`State`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`PeerError::MediaConnections`] if [`sender::State`]
-    /// creation fails.
     pub fn insert_track(
         &self,
         track: &proto::Track,

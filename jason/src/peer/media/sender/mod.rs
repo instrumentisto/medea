@@ -29,8 +29,6 @@ pub use self::component::{Component, State};
 #[derive(Clone, Debug, Display)]
 pub enum CreateError {
     /// Some [`Sender`] can't be disabled because it required.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[display(fmt = "MediaExchangeState of Sender can't be transited into \
                      disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
@@ -67,9 +65,12 @@ impl Sender {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaConnectionsError::TransceiverNotFound`] if [`State`]
-    /// has [`Some`] [`mid`], but this [`mid`] isn't found in the
-    /// [`MediaConnections`].
+    /// With [`CreateError::TransceiverNotFound`] if [`State`] has [`Some`]
+    /// [`mid`], but this [`mid`] isn't found in the [`MediaConnections`].
+    ///
+    /// With [`CreateError::CannotDisableRequiredSender`] if the provided
+    /// [`LocalTracksConstraints`] are configured to disable this [`Sender`] but
+    /// it cannot be disabled according to the provide [`State`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn new(
