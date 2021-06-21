@@ -68,6 +68,37 @@ pub enum SessionError {
     NewConnectionInfo,
 }
 
+/// The reason of why [`RpcSession`] lost connection to the server.
+#[derive(Clone, Debug, Display)]
+pub enum ConnectionLostReason {
+    /// Connection could not be established cause
+    /// [`WebSocketRpcClient::connect()`] returned error.
+    ConnectError(Traced<RpcClientError>),
+
+    /// Underlying [`WebSocketRpcClient`] reported that connection was lost.
+    Lost(super::ConnectionLostReason),
+}
+
+impl JsCaused for ConnectionLostReason {
+    type Error = platform::Error;
+
+    fn name(&self) -> &'static str {
+        match self {
+            ConnectionLostReason::ConnectError(_) => "ConnectError",
+            ConnectionLostReason::Lost(_) => "Lost",
+        }
+    }
+
+    fn js_cause(self) -> Option<Self::Error> {
+        match self {
+            ConnectionLostReason::ConnectError(err) => {
+                err.into_inner().js_cause()
+            }
+            ConnectionLostReason::Lost(_) => None,
+        }
+    }
+}
+
 /// Client to talk with server via Client API RPC.
 #[async_trait(?Send)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -262,7 +293,7 @@ impl WebSocketRpcSession {
                             }
                             Err(e) => {
                                 this.state.set(S::Lost(
-                                    ConnectionLostReason::Client(e),
+                                    ConnectionLostReason::ConnectError(e),
                                     info,
                                 ));
                             }
@@ -628,29 +659,4 @@ pub enum SessionState {
 
     /// Terminal state: transport is closed and can not be reopened.
     Finished(CloseReason),
-}
-
-// TODO: docs
-#[derive(Clone, Debug, Display)]
-pub enum ConnectionLostReason {
-    Client(Traced<RpcClientError>),
-    Lost(super::ConnectionLostReason),
-}
-
-impl JsCaused for ConnectionLostReason {
-    type Error = platform::Error;
-
-    fn name(&self) -> &'static str {
-        match self {
-            ConnectionLostReason::Client(_) => "Client",
-            ConnectionLostReason::Lost(_) => "Lost",
-        }
-    }
-
-    fn js_cause(self) -> Option<Self::Error> {
-        match self {
-            ConnectionLostReason::Client(err) => err.into_inner().js_cause(),
-            ConnectionLostReason::Lost(_) => None,
-        }
-    }
 }

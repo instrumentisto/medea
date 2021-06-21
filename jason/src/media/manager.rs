@@ -57,7 +57,7 @@ pub enum InitLocalTracksError {
 /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
 #[derive(Debug, Display, Clone)]
 #[display(fmt = "{} track is ended", _0)]
-struct LocalTrackIsEnded(pub MediaKind);
+struct LocalTrackIsEnded(MediaKind);
 
 /// Occurs if the [getUserMedia][1] request failed.
 ///

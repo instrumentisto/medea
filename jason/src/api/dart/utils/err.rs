@@ -43,7 +43,7 @@ type NewLocalMediaInitExceptionCaller = extern "C" fn(
 /// [`EnumerateDevicesException`] with the provided error `cause` and
 /// `stacktrace`.
 type NewEnumerateDevicesExceptionCaller = extern "C" fn(
-    cause: DartValue,
+    cause: DartError,
     stacktrace: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
 
@@ -312,7 +312,7 @@ impl From<EnumerateDevicesException> for DartError {
     fn from(err: EnumerateDevicesException) -> Self {
         unsafe {
             Self::new(NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER.unwrap()(
-                DartError::from(err.cause).into(),
+                err.cause.into(),
                 string_into_c_str(err.trace.to_string()),
             ))
         }

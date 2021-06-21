@@ -4,6 +4,7 @@ import 'package:ffi/ffi.dart';
 
 import 'foreign_value.dart';
 import 'native_string.dart';
+import 'unbox_handle.dart';
 
 /// Registers functions allowing Rust to create Dart [Exception]s and [Error]s.
 void registerFunctions(DynamicLibrary dl) {
@@ -21,7 +22,7 @@ void registerFunctions(DynamicLibrary dl) {
       _newLocalMediaInitException));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_new_enumerate_devices_exception_caller')(
-      Pointer.fromFunction<Handle Function(ForeignValue, Pointer<Utf8>)>(
+      Pointer.fromFunction<Handle Function(Pointer<Handle>, Pointer<Utf8>)>(
           _newEnumerateDevicesException));
 }
 
@@ -52,9 +53,9 @@ Object _newLocalMediaInitException(int kind, Pointer<Utf8> message,
 /// Creates a new [EnumerateDevicesException] with the provided error [cause]
 /// and [stacktrace].
 Object _newEnumerateDevicesException(
-    ForeignValue cause, Pointer<Utf8> stacktrace) {
+  Pointer<Handle> cause, Pointer<Utf8> stacktrace) {
   return EnumerateDevicesException(
-      cause.toDart(), stacktrace.nativeStringToDartString());
+      unboxDartHandle(cause), stacktrace.nativeStringToDartString());
 }
 
 /// Exception thrown when local media acquisition fails.

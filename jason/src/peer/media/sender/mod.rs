@@ -26,7 +26,8 @@ use super::{
 pub use self::component::{Component, State};
 
 /// Errors returned from the [`Sender::new()`] method.
-#[derive(Clone, Debug, Display)]
+#[derive(Clone, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
 pub enum CreateError {
     /// Some [`Sender`] can't be disabled because it required.
     #[display(fmt = "MediaExchangeState of Sender can't be transited into \

@@ -326,7 +326,11 @@ impl State {
         for s in &senders {
             criteria.add(s.media_kind(), s.media_source());
         }
-        let res = peer.update_local_stream(criteria).await.map(drop);
+        let res = peer
+            .update_local_stream(criteria)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+            .map(drop);
         for s in senders {
             if let Err(err) = res.clone() {
                 s.failed_local_stream_update(err);

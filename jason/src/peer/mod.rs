@@ -29,10 +29,9 @@ use crate::{
     api::JasonError,
     connection::Connections,
     media::{
-        manager::InitLocalTracksError,
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
-        RecvConstraints,
+        InitLocalTracksError, LocalTracksConstraints, MediaKind, MediaManager,
+        MediaStreamSettings, RecvConstraints,
     },
     platform,
     utils::JsCaused,

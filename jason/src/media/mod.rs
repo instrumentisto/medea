@@ -3,7 +3,7 @@
 //! [1]: https://w3.org/TR/mediacapture-streams
 
 pub mod constraints;
-pub mod manager;
+mod manager;
 pub mod track;
 
 use derive_more::Display;

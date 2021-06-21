@@ -15,8 +15,7 @@ use crate::{
         media::{receiver, sender},
         GetMidsError, PeerEvent, RtcPeerConnectionError,
     },
-    platform,
-    utils::{transpose_guarded, JsCaused, Updatable as _},
+    utils::{transpose_guarded, Updatable as _},
 };
 
 use super::{Component, PeerConnection, State};
@@ -24,14 +23,19 @@ use super::{Component, PeerConnection, State};
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
 /// [1]: https://w3.org/TR/webrtc#rtcpeerconnection-interface
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From)]
 enum PeerWatcherError {
-    // TODO: add docs
-    RtcPeerConnection(#[js(cause)] RtcPeerConnectionError),
+    /// Errors from the platform's [RTCPeerConnection][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    RtcPeerConnection(RtcPeerConnectionError),
 
+    /// Error acquiring list of `mid`s from the [`PeerConnection`].
     GetMids(GetMidsError),
 
+    /// Error creating [`Sender`].
+    ///
+    /// [`Sender`]: sender::Sender
     SenderCreateFailed(sender::CreateError),
 }
 
@@ -159,24 +163,21 @@ impl Component {
         for receiver in new_sender.receivers() {
             peer.connections.create_connection(state.id, receiver);
         }
-        let sender = match sender::Sender::new(
+        let sender = sender::Sender::new(
             &new_sender,
             &peer.media_connections,
             peer.send_constraints.clone(),
             peer.track_events_sender.clone(),
         )
-        .map_err(tracerr::map_from_and_wrap!())
-        {
-            Ok(sender) => sender,
-            Err(e) => {
-                drop(peer.peer_events_sender.unbounded_send(
-                    PeerEvent::FailedLocalMedia {
-                        error: e.clone().into(),
-                    },
-                ));
-                return Err(e);
-            }
-        };
+        .map_err(|e| {
+            drop(peer.peer_events_sender.unbounded_send(
+                PeerEvent::FailedLocalMedia {
+                    error: e.clone().into(),
+                },
+            ));
+            e
+        })
+        .map_err(tracerr::map_from_and_wrap!())?;
         peer.media_connections
             .insert_sender(sender::Component::new(sender, new_sender));
         Ok(())

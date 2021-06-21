@@ -24,10 +24,9 @@ use crate::{
     api::JasonError,
     connection::Connections,
     media::{
-        manager::InitLocalTracksError,
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaManager, MediaSourceKind,
-        MediaStreamSettings, RecvConstraints,
+        InitLocalTracksError, LocalTracksConstraints, MediaKind, MediaManager,
+        MediaSourceKind, MediaStreamSettings, RecvConstraints,
     },
     peer::{
         self, media::ProhibitedState, media_exchange_state, mute_state,
@@ -104,10 +103,6 @@ impl RoomCloseReason {
         self.is_err
     }
 }
-
-/// External handle to a [`Room`].
-#[derive(Clone)]
-pub struct RoomHandle(Weak<InnerRoom>);
 
 /// Errors thrown from [`RoomHandle::join()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
@@ -222,6 +217,10 @@ macro_rules! upgrade_inner {
             .ok_or_else(|| tracerr::new!(HandleDetachedError))
     };
 }
+
+/// External handle to a [`Room`].
+#[derive(Clone)]
+pub struct RoomHandle(Weak<InnerRoom>);
 
 impl RoomHandle {
     /// Connects to a media server and joins the [`Room`] with the provided
@@ -1191,7 +1190,6 @@ impl InnerRoom {
     /// [`MediaKind`] in all [`PeerConnection`]s of this [`Room`].
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
-    #[allow(clippy::filter_map)]
     async fn toggle_media_state(
         &self,
         state: MediaState,
@@ -1213,6 +1211,7 @@ impl InnerRoom {
                 (peer.id(), new_media_exchange_states)
             })
             .collect();
+
         self.update_media_states(tracks).await
     }
 
@@ -1220,7 +1219,6 @@ impl InnerRoom {
     /// [`PeerId`] and [`TrackId`] to the provided [`MediaState`]s.
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
-    #[allow(clippy::filter_map)]
     async fn update_media_states(
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
