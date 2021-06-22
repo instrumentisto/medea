@@ -21,32 +21,32 @@ use crate::{
 
 use super::track::local;
 
-/// Errors returned from [`MediaManagerHandle::enumerate_devices()`] method.
-#[derive(Debug, Display, Clone, JsCaused, From, Into)]
+/// Errors returned from the [`MediaManagerHandle::enumerate_devices()`] method.
+#[derive(Clone, Debug, Display, From, JsCaused, Into)]
 #[js(error = "platform::Error")]
 #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
 pub struct EnumerateDevicesError(platform::Error);
 
-/// Errors returned from [`MediaManagerHandle::init_local_tracks()`] method.
-#[derive(Clone, Debug, Display, JsCaused, From)]
+/// Errors returned from the [`MediaManagerHandle::init_local_tracks()`] method.
+#[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum InitLocalTracksError {
-    /// Occurs if the [getUserMedia][1] request failed.
+    /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be
+    /// upgraded.
+    #[display(fmt = "MediaManagerHandle is in detached state")]
+    Detached,
+
+    /// Occurs if the [getUserMedia][1] request fails.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     GetUserMediaFailed(#[js(cause)] GetUserMediaError),
 
-    /// Occurs if the [getDisplayMedia()][1] request failed.
+    /// Occurs if the [getDisplayMedia()][1] request fails.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     GetDisplayMediaFailed(#[js(cause)] GetDisplayMediaError),
-
-    /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be
-    /// upgraded.
-    #[display(fmt = "MediaManagerHandle is in detached state")]
-    Detached,
 }
 
 /// Occurs when local track is [`ended`][1] right after
@@ -59,13 +59,13 @@ pub enum InitLocalTracksError {
 #[display(fmt = "{} track is ended", _0)]
 struct LocalTrackIsEnded(MediaKind);
 
-/// Occurs if the [getUserMedia][1] request failed.
+/// Occurs if the [getUserMedia][1] request fails.
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
 #[derive(Debug, Display, Clone, JsCaused, From)]
 #[js(error = "platform::Error")]
 pub enum GetUserMediaError {
-    /// Occurs if the [getUserMedia][1] request failed.
+    /// Occurs if the [getUserMedia][1] request fails.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
@@ -77,7 +77,7 @@ pub enum GetUserMediaError {
     /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/rnxcavf
     /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-    #[from(ignore)]
+    #[display(fmt = "New {} local track is ended", _0)]
     LocalTrackIsEnded(MediaKind),
 }
 
@@ -88,13 +88,13 @@ impl From<LocalTrackIsEnded> for GetUserMediaError {
     }
 }
 
-/// Occurs if the [getDisplayMedia()][1] request failed.
+/// Occurs if the [getDisplayMedia()][1] request fails.
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Debug, Display, Clone, JsCaused, From)]
 #[js(error = "platform::Error")]
 pub enum GetDisplayMediaError {
-    /// Occurs if the [getDisplayMedia()][1] request failed.
+    /// Occurs if the [getDisplayMedia()][1] request fails.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
@@ -106,7 +106,7 @@ pub enum GetDisplayMediaError {
     /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/rnxcavf
     /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-    #[from(ignore)]
+    #[display(fmt = "New {} local track is ended", _0)]
     LocalTrackIsEnded(MediaKind),
 }
 

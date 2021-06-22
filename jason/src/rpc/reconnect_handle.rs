@@ -22,7 +22,7 @@ pub enum ReconnectError {
     #[display(fmt = "Connection with a server was lost: {}", _0)]
     ConnectionLost(ConnectionLostReason),
 
-    /// Could not authorize session.
+    /// Could not authorize RPC session.
     #[display(fmt = "Failed to authorize RPC session")]
     AuthorizationFailed,
 

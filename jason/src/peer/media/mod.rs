@@ -175,8 +175,8 @@ pub trait MediaStateControllable {
     ///
     /// # Errors
     ///
-    /// With approved stable [`MediaState`] if transition to the `desired_state`
-    /// could not be made.
+    /// With an approved stable [`MediaState`] if transition to the
+    /// `desired_state` could not be made.
     ///
     /// [`Future`]: std::future::Future
     /// [`MediaState`]: super::MediaState
@@ -211,8 +211,6 @@ pub enum TrackDirection {
 }
 
 /// Media state transition is not allowed.
-///
-/// E.g. cannot disable required [`Sender`].
 #[derive(Clone, Debug, Display, From)]
 pub enum ProhibitedState {
     /// Some [`Sender`] can't be disabled because it required.
@@ -222,14 +220,16 @@ pub enum ProhibitedState {
 }
 
 /// Errors returned from the [`MediaConnections::insert_local_tracks()`] method.
-#[derive(Clone, Debug, Display, JsCaused, From)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum InsertLocalTracksError {
-    /// Occurs when [`local::Track`] does not satisfy [`Sender`] constraints.
+    /// Occurs when a [`local::Track`] does not satisfy [`Sender`]'s
+    /// constraints.
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// Occurs when not enough [`local::Track`]s are inserted into senders.
+    /// Occurs when there are not enough [`local::Track`]s being inserted into
+    /// senders.
     #[display(fmt = "Provided stream does not have all necessary Tracks")]
     NotEnoughTracks,
 
@@ -417,10 +417,10 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with [`GetMidsError::SendersWithoutMid`] if some [`Sender`]
+    /// Errors with a [`GetMidsError::SendersWithoutMid`] if some [`Sender`]
     /// doesn't have [mid].
     ///
-    /// Errors with [`GetMidsError::ReceiversWithoutMid`] if some [`Receiver`]
+    /// Errors with a [`GetMidsError::ReceiversWithoutMid`] if some [`Receiver`]
     /// doesn't have [mid].
     ///
     /// [mid]:
@@ -540,14 +540,14 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// With [`InsertLocalTracksError::NotEnoughTracks`] if provided [`HashMap`]
-    /// doesn't contain required [`local::Track`].
+    /// With an [`InsertLocalTracksError::NotEnoughTracks`] if provided
+    /// [`HashMap`] doesn't contain required [`local::Track`].
     ///
-    /// With [`InsertLocalTracksError::InvalidMediaTrack`] if some
+    /// With an [`InsertLocalTracksError::InvalidMediaTrack`] if some
     /// [`local::Track`] cannot be inserted into associated [`Sender`] because
     /// of constraints mismatch.
     ///
-    /// With [`InsertLocalTracksError::CouldNotInsertLocalTrack`] if some
+    /// With an[`InsertLocalTracksError::CouldNotInsertLocalTrack`] if some
     /// [`local::Track`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
@@ -603,7 +603,7 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with transceivers `mid` if  could not find [`Receiver`] by this
+    /// Errors with a transceivers `mid` if could not find [`Receiver`] by this
     /// `mid`.
     ///
     /// # Panics

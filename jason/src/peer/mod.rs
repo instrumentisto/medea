@@ -52,11 +52,11 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
 };
 
-/// Errors returned from [`PeerConnection::update_local_stream()`] method.
+/// Errors returned from the [`PeerConnection::update_local_stream()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum UpdateLocalStreamError {
-    /// Errors that may occur when validating [`TracksRequest`].
+    /// Errors that occur [`TracksRequest`] validation fails.
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
@@ -285,7 +285,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`RtcPeerConnectionError::PeerCreationError`] if
+    /// Errors with an [`RtcPeerConnectionError::PeerCreationError`] if
     /// [`platform::RtcPeerConnection`] creating fails.
     pub fn new(
         state: &State,
@@ -484,12 +484,7 @@ impl PeerConnection {
     /// Sends [`platform::RtcStats`] update of this [`PeerConnection`] to a
     /// server.
     pub async fn scrape_and_send_peer_stats(&self) {
-        match self
-            .peer
-            .get_stats()
-            .await
-            .map_err(tracerr::map_from_and_wrap!(=> RtcPeerConnectionError))
-        {
+        match self.peer.get_stats().await {
             Ok(stats) => self.send_peer_stats(stats),
             Err(e) => log::error!("{}", e),
         };
@@ -666,17 +661,18 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`UpdateLocalStreamError::InvalidLocalTracks`] if current state of
-    /// peer's [`Sender`]s cannot be represented as [`SimpleTracksRequest`]
-    /// (max 1 audio [`Sender`] and max 2 video [`Sender`]s), or
-    /// [`local::Track`]s requested from [`MediaManager`] does not satisfy
-    /// [`Sender`]'s constraints.
+    /// With an [`UpdateLocalStreamError::InvalidLocalTracks`] if the current
+    /// state of the [`PeerConnection`]'s [`Sender`]s cannot be represented as
+    /// [`SimpleTracksRequest`] (max 1 audio [`Sender`] and max 2 video
+    /// [`Sender`]s), or the [`local::Track`]s requested from the
+    /// [`MediaManager`] does not satisfy [`Sender`]'s constraints.
     ///
-    /// With [`UpdateLocalStreamError::CouldNotGetLocalMedia`] if
+    /// With an [`UpdateLocalStreamError::CouldNotGetLocalMedia`] if the
     /// [`local::Track`]s could not be obtained from the UA.
     ///
-    /// With [`UpdateLocalStreamError::InvalidLocalTracks`] if [`local::Track`]s
-    /// couldn't inserted into [`PeerConnection`]s [`Sender`]s.
+    /// With an [`UpdateLocalStreamError::InvalidLocalTracks`] if the
+    /// [`local::Track`]s couldn't inserted into [`PeerConnection`]s
+    /// [`Sender`]s.
     ///
     /// [`Sender`]: sender::Sender
     /// [1]: https://w3.org/TR/mediacapture-streams#mediastream
@@ -706,7 +702,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`TracksRequestError`] if failed to create or merge
+    /// Errors with a [`TracksRequestError`] if failed to create or merge
     /// [`SimpleTracksRequest`].
     pub fn get_media_settings(
         &self,
@@ -731,7 +727,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`TracksRequestError`] if failed to create or merge
+    /// Errors with a [`TracksRequestError`] if failed to create or merge
     /// [`SimpleTracksRequest`].
     fn get_simple_tracks_request(
         &self,

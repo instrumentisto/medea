@@ -187,8 +187,8 @@ mod mock {
         cause: Dart_Handle,
     ) -> DartResult {
         let cause = platform::Error::from(cause);
-        let err = tracerr::new!(EnumerateDevicesError::from(cause));
-        DartError::from(err).into()
+        DartError::from(tracerr::new!(EnumerateDevicesError::from(cause)))
+            .into()
     }
 
     #[no_mangle]

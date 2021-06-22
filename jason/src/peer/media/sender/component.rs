@@ -48,8 +48,8 @@ enum LocalTrackState {
 
     /// Indicates that new [`local::Track`] getting is failed.
     ///
-    /// Contains [`UpdateLocalStreamError`] with which
-    /// [getUserMedia()][1]/[getDisplayMedia()][2] request was failed.
+    /// Contains an [`UpdateLocalStreamError`] with which
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request failed.
     ///
     /// [`local::Track`]: crate::media::track::local::Track
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia

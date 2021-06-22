@@ -72,7 +72,7 @@ pub enum SessionError {
 #[derive(Clone, Debug, Display)]
 pub enum ConnectionLostReason {
     /// Connection could not be established cause
-    /// [`WebSocketRpcClient::connect()`] returned error.
+    /// [`WebSocketRpcClient::connect()`] call returned error.
     ConnectError(Traced<RpcClientError>),
 
     /// Underlying [`WebSocketRpcClient`] reported that connection was lost.

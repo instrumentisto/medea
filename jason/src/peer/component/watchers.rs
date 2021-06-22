@@ -20,9 +20,7 @@ use crate::{
 
 use super::{Component, PeerConnection, State};
 
-/// Errors that may occur in [RTCPeerConnection][1].
-///
-/// [1]: https://w3.org/TR/webrtc#rtcpeerconnection-interface
+/// Errors that may occur in watchers of a [`Component`].
 #[derive(Clone, Debug, Display, From)]
 enum PeerWatcherError {
     /// Errors from the platform's [RTCPeerConnection][1].

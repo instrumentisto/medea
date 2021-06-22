@@ -103,7 +103,7 @@ impl RoomCloseReason {
     }
 }
 
-/// Errors thrown from [`RoomHandle::join()`] method.
+/// Errors that may be thrown from [`RoomHandle::join()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum RoomJoinError {
@@ -194,7 +194,7 @@ impl From<UpdateLocalStreamError> for ChangeMediaStateError {
     }
 }
 
-/// Errors that occur when [`Room`] is acquiring [`local::Track`]s from the
+/// Errors that occur when [`Room`] is trying to acquire [`local::Track`]s via
 /// [`MediaManager`].
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
@@ -242,7 +242,7 @@ impl RoomHandle {
     /// With [`RoomJoinError::CallbackNotSet`] if `on_failed_local_media` or
     /// `on_connection_loss` callback is not set.
     ///
-    /// With [`RoomJoinError::SessionError`] when unable to connect to a media
+    /// With [`RoomJoinError::SessionError`] if unable to connect to a media
     /// server.
     pub async fn join(&self, url: String) -> Result<(), Traced<RoomJoinError>> {
         let inner = self
@@ -858,8 +858,7 @@ impl Room {
                             if let Err(e) = event
                                 .dispatch_with(&*inner)
                                 .await
-                                .map_err(tracerr::map_from_and_wrap!(
-                                        => RoomEventHandlerError))
+                                .map_err(tracerr::wrap!(=> UnknownPeerId))
                             {
                                 log::error!("{}", e);
                             };
@@ -868,8 +867,7 @@ impl Room {
                             if let Err(e) = event
                                 .dispatch_with(&*inner)
                                 .await
-                                .map_err(tracerr::map_from_and_wrap!(
-                                        => RoomEventHandlerError))
+                                .map_err(tracerr::wrap!(=> UnknownRemoteMember))
                             {
                                 log::error!("{}", e);
                             };
@@ -989,7 +987,8 @@ struct InnerRoom {
     close_reason: RefCell<CloseReason>,
 }
 
-/// Error for the [`RoomHandle::set_local_media_settings`].
+/// Errors that may be thrown from the
+/// [`RoomHandle::set_local_media_settings()`] method.
 #[derive(Debug, Display)]
 pub enum ConstraintsUpdateError {
     /// New [`MediaStreamSettings`] set failed and state was recovered
@@ -997,7 +996,7 @@ pub enum ConstraintsUpdateError {
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
     Recovered {
-        /// [`ChangeMediaStateError`] due to which recovery happened.
+        /// [`ChangeMediaStateError`] due to which recovery has happened.
         recover_reason: Traced<ChangeMediaStateError>,
     },
 
@@ -1005,14 +1004,15 @@ pub enum ConstraintsUpdateError {
     /// failed.
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
-        /// [`ChangeMediaStateError`] due to which recovery happened.
+        /// [`ChangeMediaStateError`] due to which recovery has happened.
         recover_reason: Traced<ChangeMediaStateError>,
 
-        /// [`ChangeMediaStateError`]s due to which recovery failed.
+        /// Vector of [`ChangeMediaStateError`]s due to which recovery has
+        /// failed.
         recover_fail_reasons: Vec<Traced<ChangeMediaStateError>>,
     },
 
-    /// Indicates that some error occurred.
+    /// Some other error occurred.
     #[display(fmt = "ErroredException")]
     Errored(Traced<ChangeMediaStateError>),
 }
@@ -1025,10 +1025,8 @@ impl ConstraintsUpdateError {
         self.to_string()
     }
 
-    /// Returns a [`UpdateLocalStreamError`] if this [`ConstraintsUpdateError`]
+    /// Returns a [`ChangeMediaStateError`] if this [`ConstraintsUpdateError`]
     /// represents a `RecoveredException` or a `RecoverFailedException`.
-    ///
-    /// Returns `undefined` otherwise.
     #[inline]
     #[must_use]
     pub fn recover_reason(&self) -> Option<Traced<ChangeMediaStateError>> {
@@ -1041,7 +1039,7 @@ impl ConstraintsUpdateError {
         }
     }
 
-    /// Returns a list of [`UpdateLocalStreamError`]s due to which a recovery
+    /// Returns a list of [`ChangeMediaStateError`]s due to which a recovery
     /// has failed.
     #[inline]
     #[must_use]
@@ -1055,10 +1053,8 @@ impl ConstraintsUpdateError {
         }
     }
 
-    /// Returns a [`UpdateLocalStreamError`] if this [`ConstraintsUpdateError`]
+    /// Returns a [`ChangeMediaStateError`] if this [`ConstraintsUpdateError`]
     /// represents an `ErroredException`.
-    ///
-    /// Returns `undefined` otherwise.
     #[inline]
     #[must_use]
     pub fn error(&self) -> Option<Traced<ChangeMediaStateError>> {
@@ -1068,14 +1064,14 @@ impl ConstraintsUpdateError {
         }
     }
 
-    /// Returns new [`ConstraintsUpdateError::Recovered`].
+    /// Returns a new [`ConstraintsUpdateError::Recovered`].
     #[inline]
     #[must_use]
     fn recovered(recover_reason: Traced<ChangeMediaStateError>) -> Self {
         Self::Recovered { recover_reason }
     }
 
-    /// Converts this [`ConstraintsUpdateError`] to the
+    /// Converts this [`ChangeMediaStateError`] to the
     /// [`ConstraintsUpdateError::RecoverFailed`].
     #[must_use]
     fn recovery_failed(self, reason: Traced<ChangeMediaStateError>) -> Self {
@@ -1102,7 +1098,8 @@ impl ConstraintsUpdateError {
         }
     }
 
-    /// Returns [`ConstraintsUpdateError::Errored`] with a provided parameter.
+    /// Returns a [`ConstraintsUpdateError::Errored`] with the provided
+    /// [`ChangeMediaStateError`].
     #[inline]
     #[must_use]
     fn errored(error: Traced<ChangeMediaStateError>) -> Self {
@@ -1538,23 +1535,15 @@ impl InnerRoom {
     }
 }
 
-/// Errors that may occur in a [`Room`].
+/// [`RpcEvent`] contains [`PeerId`] that [`Room`] is not aware of.
 #[derive(Clone, Debug, Display)]
-enum RoomEventHandlerError {
-    /// Returned if the requested [`PeerConnection`] is not found.
-    #[display(fmt = "Peer with id {} doesnt exist", _0)]
-    NoSuchPeer(PeerId),
-
-    /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
-    /// connection with remote `Member`.
-    #[display(fmt = "Remote stream from unknown member")]
-    UnknownRemoteMember,
-}
+#[display(fmt = "Peer with id {} doesnt exist", _0)]
+struct UnknownPeerId(PeerId);
 
 /// RPC events handling.
 #[async_trait(?Send)]
 impl EventHandler for InnerRoom {
-    type Output = Result<(), Traced<RoomEventHandlerError>>;
+    type Output = Result<(), Traced<UnknownPeerId>>;
 
     /// Creates [`PeerConnection`] with a provided ID and all the
     /// [`Connection`]s basing on provided [`Track`]s.
@@ -1592,9 +1581,11 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         sdp_answer: String,
     ) -> Self::Output {
-        let peer = self.peers.state().get(peer_id).ok_or_else(|| {
-            tracerr::new!(RoomEventHandlerError::NoSuchPeer(peer_id))
-        })?;
+        let peer = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
         peer.set_remote_sdp(sdp_answer);
 
         Ok(())
@@ -1606,9 +1597,11 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         local_sdp: String,
     ) -> Self::Output {
-        let peer_state = self.peers.state().get(peer_id).ok_or_else(|| {
-            tracerr::new!(RoomEventHandlerError::NoSuchPeer(peer_id))
-        })?;
+        let peer_state = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
         peer_state.apply_local_sdp(local_sdp);
 
         Ok(())
@@ -1620,9 +1613,11 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         candidate: IceCandidate,
     ) -> Self::Output {
-        let peer = self.peers.state().get(peer_id).ok_or_else(|| {
-            tracerr::new!(RoomEventHandlerError::NoSuchPeer(peer_id))
-        })?;
+        let peer = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
         peer.add_ice_candidate(candidate);
 
         Ok(())
@@ -1650,9 +1645,11 @@ impl EventHandler for InnerRoom {
         updates: Vec<PeerUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer_state = self.peers.state().get(peer_id).ok_or_else(|| {
-            tracerr::new!(RoomEventHandlerError::NoSuchPeer(peer_id))
-        })?;
+        let peer_state = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
 
         for update in updates {
             match update {
@@ -1714,10 +1711,15 @@ impl EventHandler for InnerRoom {
     }
 }
 
+/// [`PeerEvent::NewRemoteTrack`] contains unknown remote [`MemberId`].
+#[derive(Clone, Debug, Display)]
+#[display(fmt = "Remote stream from unknown member")]
+struct UnknownRemoteMember(MemberId);
+
 /// [`PeerEvent`]s handling.
 #[async_trait(?Send)]
 impl PeerEventHandler for InnerRoom {
-    type Output = Result<(), Traced<RoomEventHandlerError>>;
+    type Output = Result<(), Traced<UnknownRemoteMember>>;
 
     /// Handles [`PeerEvent::IceCandidateDiscovered`] event and sends received
     /// candidate to RPC server.
@@ -1749,9 +1751,10 @@ impl PeerEventHandler for InnerRoom {
         sender_id: MemberId,
         track: remote::Track,
     ) -> Self::Output {
-        let conn = self.connections.get(&sender_id).ok_or_else(|| {
-            tracerr::new!(RoomEventHandlerError::UnknownRemoteMember)
-        })?;
+        let conn = self
+            .connections
+            .get(&sender_id)
+            .ok_or_else(|| tracerr::new!(UnknownRemoteMember(sender_id)))?;
         conn.add_remote_track(track);
 
         Ok(())
