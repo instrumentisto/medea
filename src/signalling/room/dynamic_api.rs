@@ -371,13 +371,13 @@ impl Handler<Delete> for Room {
                 }
             }
         }
-        member_ids.into_iter().for_each(|fid| {
+        for fid in member_ids {
             self.delete_member(&fid.member_id(), ctx);
-        });
-        endpoint_ids.into_iter().for_each(|fid| {
+        }
+        for fid in endpoint_ids {
             let (_, member_id, endpoint_id) = fid.take_all();
             self.delete_endpoint(&member_id, endpoint_id);
-        });
+        }
     }
 }
 

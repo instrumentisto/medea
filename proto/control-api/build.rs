@@ -1,3 +1,5 @@
+#![forbid(non_ascii_idents, unsafe_code)]
+
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -10,7 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// gRPC Protobuf specs compilation.
 #[cfg(feature = "grpc")]
 mod grpc {
-    use std::{borrow::Cow, error::Error, fs, io};
+    use std::{error::Error, fs, io};
 
     /// Path to Protobuf source files.
     const GRPC_DIR: &str = "src/grpc";
@@ -85,8 +87,7 @@ mod grpc {
                 .map(|entry| entry.path())
                 .filter(|path| {
                     path.extension().map_or(false, |ext| {
-                        path.is_file()
-                            && ext.to_string_lossy() == Cow::from("proto")
+                        path.is_file() && ext.to_string_lossy() == *"proto"
                     })
                 })
                 .filter_map(|path| {

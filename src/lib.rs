@@ -2,6 +2,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
+#![forbid(non_ascii_idents, unsafe_code)]
 
 #[macro_use]
 pub mod utils;
