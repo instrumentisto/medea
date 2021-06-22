@@ -53,7 +53,7 @@ Object _newLocalMediaInitException(int kind, Pointer<Utf8> message,
 /// Creates a new [EnumerateDevicesException] with the provided error [cause]
 /// and [stacktrace].
 Object _newEnumerateDevicesException(
-  Pointer<Handle> cause, Pointer<Utf8> stacktrace) {
+    Pointer<Handle> cause, Pointer<Utf8> stacktrace) {
   return EnumerateDevicesException(
       unboxDartHandle(cause), stacktrace.nativeStringToDartString());
 }

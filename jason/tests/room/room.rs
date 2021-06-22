@@ -2181,7 +2181,7 @@ mod set_local_media_settings {
         let room_handle = api::RoomHandle::from(room.new_handle());
 
         let (cb, test_result) = js_callback!(|err: api::JasonError| {
-            cb_assert_eq!(&err.name(), "SenderCreateFailed");
+            cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
             cb_assert_eq!(
                 err.message(),
                 "MediaExchangeState of Sender can't be transited into \

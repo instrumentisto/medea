@@ -10,7 +10,7 @@ use web_sys as sys;
 use medea_jason::{
     api,
     media::{
-        manager::{GetUserMediaError, InitLocalTracksError},
+        GetUserMediaError, InitLocalTracksError,
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, MediaKind, MediaManager,
         MediaStreamSettings,

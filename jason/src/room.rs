@@ -855,16 +855,20 @@ impl Room {
                 if let Some(inner) = inner.upgrade() {
                     match event {
                         RoomEvent::RpcEvent(event) => {
-                            if let Err(e) =
-                                event.dispatch_with(&*inner).await.map_err(tracerr::map_from_and_wrap!(
+                            if let Err(e) = event
+                                .dispatch_with(&*inner)
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!(
                                         => RoomEventHandlerError))
                             {
                                 log::error!("{}", e);
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(e) =
-                                event.dispatch_with(&*inner).await.map_err(tracerr::map_from_and_wrap!(
+                            if let Err(e) = event
+                                .dispatch_with(&*inner)
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!(
                                         => RoomEventHandlerError))
                             {
                                 log::error!("{}", e);
