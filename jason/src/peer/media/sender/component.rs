@@ -359,7 +359,8 @@ impl State {
         matches!(self.local_track_state.get(), LocalTrackState::NeedUpdate)
     }
 
-    /// Transits [`State::local_track_state`] to a failed state.
+    /// Marks an inner `local_track_state` of this [`State`] as failed with the
+    /// provided `error`.
     #[inline]
     pub fn failed_local_stream_update(
         &self,
@@ -368,7 +369,7 @@ impl State {
         self.local_track_state.set(LocalTrackState::Failed(error));
     }
 
-    /// Transits [`State::local_track_state`] to a stable state.
+    /// Marks an inner `local_track_state` of this [`State`] as stable.
     #[inline]
     pub fn local_stream_updated(&self) {
         self.local_track_state.set(LocalTrackState::Stable);

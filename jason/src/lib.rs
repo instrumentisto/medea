@@ -4,6 +4,7 @@
 
 #![allow(clippy::module_name_repetitions)]
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
+#![forbid(non_ascii_idents)]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 

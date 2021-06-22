@@ -128,7 +128,7 @@ impl Handler<OsSignal> for GracefulShutdown {
             return future::ready(()).boxed_local();
         }
 
-        let subs = mem::replace(&mut self.subs, BTreeMap::new());
+        let subs = mem::take(&mut self.subs);
         let ordered_subs: Vec<_> = subs
             .into_iter()
             .rev()

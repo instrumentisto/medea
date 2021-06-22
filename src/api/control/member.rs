@@ -231,7 +231,7 @@ impl MemberSpec {
             MemberElement::WebRtcPlayEndpoint { spec } => {
                 Some((id.clone().into(), spec))
             }
-            _ => None,
+            MemberElement::WebRtcPublishEndpoint { .. } => None,
         })
     }
 
@@ -271,7 +271,7 @@ impl MemberSpec {
             MemberElement::WebRtcPublishEndpoint { spec } => {
                 Some((id.clone().into(), spec))
             }
-            _ => None,
+            MemberElement::WebRtcPlayEndpoint { .. } => None,
         })
     }
 

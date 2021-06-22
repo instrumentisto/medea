@@ -1,3 +1,5 @@
+#![forbid(non_ascii_idents, unsafe_code)]
+
 mod browser;
 mod conf;
 mod control;

@@ -1,4 +1,5 @@
 #![allow(clippy::module_name_repetitions)]
+#![forbid(non_ascii_idents, unsafe_code)]
 
 mod callbacks;
 mod grpc_control_api;

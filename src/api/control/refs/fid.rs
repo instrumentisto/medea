@@ -153,13 +153,13 @@ mod specs {
 
     #[test]
     fn returns_error_on_missing_path() {
-        for fid_str in &[
+        for fid_str in [
             "room_id//endpoint_id",
             "//endpoint_id",
             "//member_id/endpoint_id",
             "/member_id",
         ] {
-            match StatefulFid::try_from((*fid_str).to_string()) {
+            match StatefulFid::try_from(fid_str.to_string()) {
                 Ok(f) => unreachable!("Unexpected successful parse: {}", f),
                 Err(e) => match e {
                     ParseFidError::MissingPath(_) => (),
@@ -171,12 +171,12 @@ mod specs {
 
     #[test]
     fn returns_error_on_too_many_paths() {
-        for fid_str in &[
+        for fid_str in [
             "room_id/member_id/endpoint_id/something_else",
             "room_id/member_id/endpoint_id/",
             "room_id/member_id/endpoint_id////",
         ] {
-            match StatefulFid::try_from((*fid_str).to_string()) {
+            match StatefulFid::try_from(fid_str.to_string()) {
                 Ok(f) => unreachable!("Unexpected successful parse: {}", f),
                 Err(e) => match e {
                     ParseFidError::TooManyPaths(_) => (),
@@ -237,13 +237,13 @@ mod specs {
 
     #[test]
     fn serializes_into_original_fid() {
-        for fid_str in &[
+        for fid_str in [
             "room_id",
             "room_id/member_id",
             "room_id/member_id/endpoint_id",
         ] {
-            let fid = StatefulFid::try_from((*fid_str).to_string()).unwrap();
-            assert_eq!((*fid_str).to_string(), fid.to_string());
+            let fid = StatefulFid::try_from(fid_str.to_string()).unwrap();
+            assert_eq!(fid_str, &fid.to_string());
         }
     }
 }

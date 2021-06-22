@@ -3,7 +3,6 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    ops::Deref as _,
     rc::{Rc, Weak},
 };
 
@@ -856,20 +855,16 @@ impl Room {
                 if let Some(inner) = inner.upgrade() {
                     match event {
                         RoomEvent::RpcEvent(event) => {
-                            if let Err(e) = event
-                                .dispatch_with(inner.deref())
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!(
+                            if let Err(e) =
+                                event.dispatch_with(&*inner).await.map_err(tracerr::map_from_and_wrap!(
                                         => RoomEventHandlerError))
                             {
                                 log::error!("{}", e);
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(e) = event
-                                .dispatch_with(inner.deref())
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!(
+                            if let Err(e) =
+                                event.dispatch_with(&*inner).await.map_err(tracerr::map_from_and_wrap!(
                                         => RoomEventHandlerError))
                             {
                                 log::error!("{}", e);
@@ -1038,7 +1033,7 @@ impl ConstraintsUpdateError {
             | Self::Recovered { recover_reason, .. } => {
                 Some(recover_reason.clone())
             }
-            _ => None,
+            Self::Errored(_) => None,
         }
     }
 
@@ -1362,18 +1357,14 @@ impl InnerRoom {
         source_kind: Option<proto::MediaSourceKind>,
         state: MediaState,
     ) -> bool {
-        self.peers
-            .get_all()
-            .into_iter()
-            .find(|p| {
-                !p.is_all_transceiver_sides_in_media_state(
-                    kind,
-                    direction,
-                    source_kind,
-                    state,
-                )
-            })
-            .is_none()
+        !self.peers.get_all().into_iter().any(|p| {
+            !p.is_all_transceiver_sides_in_media_state(
+                kind,
+                direction,
+                source_kind,
+                state,
+            )
+        })
     }
 
     /// Updates [`MediaState`]s to the provided `states_update` and disables all
@@ -1635,9 +1626,9 @@ impl EventHandler for InnerRoom {
 
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
-        peer_ids.iter().for_each(|id| {
-            self.peers.state().remove(*id);
-        });
+        for id in peer_ids {
+            self.peers.state().remove(id);
+        }
         Ok(())
     }
 

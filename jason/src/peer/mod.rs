@@ -641,12 +641,13 @@ impl PeerConnection {
     }
 
     /// Updates [`local::Track`]s being used in [`PeerConnection`]s [`Sender`]s.
-    /// [`Sender`]s are chosen based on provided [`LocalStreamUpdateCriteria`].
+    /// [`Sender`]s are chosen based on the provided
+    /// [`LocalStreamUpdateCriteria`].
     ///
-    /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
-    /// date (you set those with [`State::senders`]) and [`State::senders`] are
-    /// synchronized with a real object state. If there are no senders
-    /// configured in this [`PeerConnection`], then this method is no-op.
+    /// First of all makes sure that [`PeerConnection`] [`Sender`]s are
+    /// up-to-date and synchronized with a real object state. If there are no
+    /// [`Sender`]s configured in this [`PeerConnection`], then this method is
+    /// no-op.
     ///
     /// Secondly, make sure that configured [`LocalTracksConstraints`] are up to
     /// date.
