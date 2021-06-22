@@ -372,7 +372,7 @@ mod to_handler_fn_name_spec {
             ("s", "on_s"),
             ("ASDF", "on_asdf"),
         ] {
-            assert_eq!(to_handler_fn_name(name), *expected);
+            assert_eq!(to_handler_fn_name(name), expected);
         }
     }
 

@@ -577,7 +577,7 @@ impl PeerChange {
 impl<T> PeerChangeHandler for Peer<T> {
     type Output = PeerChange;
 
-    /// Inserts provided [`MediaTrack`] into the `senders` of this [`Context`].
+    /// Inserts the provided [`MediaTrack`] into `senders` of this [`Context`].
     #[inline]
     fn on_add_send_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
         self.context.senders.insert(track.id(), Rc::clone(&track));
@@ -585,7 +585,7 @@ impl<T> PeerChangeHandler for Peer<T> {
         PeerChange::AddSendTrack(track)
     }
 
-    /// Inserts provided [`MediaTrack`] into the `receivers` of this
+    /// Inserts the provided [`MediaTrack`] into `receivers` of this
     /// [`Context`].
     #[inline]
     fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {

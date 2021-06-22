@@ -353,9 +353,8 @@ mod specs {
             "local://room_id/member_id/endpoint_id",
         ] {
             let local_uri =
-                StatefulLocalUri::try_from((*local_uri_str).to_string())
-                    .unwrap();
-            assert_eq!((*local_uri_str).to_string(), local_uri.to_string());
+                StatefulLocalUri::try_from(local_uri_str.to_string()).unwrap();
+            assert_eq!(local_uri_str, &local_uri.to_string());
         }
     }
 
@@ -366,7 +365,7 @@ mod specs {
             "local:////endpoint_id",
             "local:///member_id/endpoint_id",
         ] {
-            match StatefulLocalUri::try_from((*local_uri_str).to_string()) {
+            match StatefulLocalUri::try_from(local_uri_str.to_string()) {
                 Ok(_) => unreachable!(),
                 Err(e) => match e {
                     LocalUriParseError::MissingPaths(_) => (),

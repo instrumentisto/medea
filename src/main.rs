@@ -1,5 +1,7 @@
 //! Medea media server application.
 
+#![forbid(non_ascii_idents, unsafe_code)]
+
 use actix::{Actor, System};
 use failure::Error;
 use medea::{

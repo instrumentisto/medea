@@ -1,5 +1,7 @@
 //! Compiles `trampoline.c` and links it into the final library.
 
+#![forbid(non_ascii_idents, unsafe_code)]
+
 use std::env;
 
 fn main() {

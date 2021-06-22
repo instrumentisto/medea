@@ -1,3 +1,5 @@
+#![forbid(non_ascii_idents, unsafe_code)]
+
 use medea_jason::utils::JsCaused;
 
 struct JsError {}

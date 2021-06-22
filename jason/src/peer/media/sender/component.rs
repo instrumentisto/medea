@@ -365,14 +365,14 @@ impl State {
         matches!(self.local_track_state.get(), LocalTrackState::NeedUpdate)
     }
 
-    /// Marks inner `local_track_state` of this [`State`] as failed with the
+    /// Marks an inner `local_track_state` of this [`State`] as failed with the
     /// provided `error`.
     #[inline]
     pub fn failed_local_stream_update(&self, error: Traced<PeerError>) {
         self.local_track_state.set(LocalTrackState::Failed(error));
     }
 
-    /// Marks inner `local_track_state` of this [`State`] as stable.
+    /// Marks an inner `local_track_state` of this [`State`] as stable.
     #[inline]
     pub fn local_stream_updated(&self) {
         self.local_track_state.set(LocalTrackState::Stable);

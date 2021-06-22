@@ -295,9 +295,9 @@ impl<C> VideoTrackConstraints<C> {
 
 impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
     /// Indicates whether the provided [`platform::MediaStreamTrack`] satisfies
-    /// this [`VideoTrackConstraints`].
+    /// these [`VideoTrackConstraints`].
     ///
-    /// Returns `false` if this [`VideoTrackConstraints`] doesn't have any
+    /// Returns `false` if these [`VideoTrackConstraints`] don't have any
     /// constraints configured.
     #[inline]
     #[must_use]
@@ -314,9 +314,9 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
 
 impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
     /// Indicates whether the provided [`platform::MediaStreamTrack`] satisfies
-    /// this [`VideoTrackConstraints`].
+    /// these [`VideoTrackConstraints`].
     ///
-    /// Returns `false` if this [`VideoTrackConstraints`] doesn't have any
+    /// Returns `false` if these [`VideoTrackConstraints`] don't have any
     /// constraints configured.
     #[inline]
     #[must_use]
@@ -557,8 +557,8 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets the underlying `enabled` field of this [`AudioMediaTracksSettings`]
-    /// to the given value.
+    /// Sets the underlying `enabled` field of these
+    /// [`AudioMediaTracksSettings`] to the given value.
     #[inline]
     pub fn set_audio_publish(&mut self, enabled: bool) {
         self.audio.enabled = enabled;

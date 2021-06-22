@@ -18,7 +18,7 @@
     trivial_casts,
     trivial_numeric_casts
 )]
-#![forbid(unsafe_code, non_ascii_idents)]
+#![forbid(non_ascii_idents, unsafe_code)]
 #![warn(
     deprecated_in_future,
     missing_copy_implementations,

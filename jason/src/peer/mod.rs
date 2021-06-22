@@ -659,9 +659,9 @@ impl PeerConnection {
     /// [`Sender`]s are chosen based on the provided
     /// [`LocalStreamUpdateCriteria`].
     ///
-    /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
-    /// date and they are synchronized with a real object state. If there are no
-    /// [`Sender`]s. configured in this [`PeerConnection`], then this method is
+    /// First of all makes sure that [`PeerConnection`] [`Sender`]s are
+    /// up-to-date and synchronized with a real object state. If there are no
+    /// [`Sender`]s configured in this [`PeerConnection`], then this method is
     /// no-op.
     ///
     /// Secondly, make sure that configured [`LocalTracksConstraints`] are up to

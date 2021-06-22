@@ -1,3 +1,5 @@
+#![forbid(non_ascii_idents, unsafe_code)]
+
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
