@@ -1,4 +1,5 @@
 #![cfg(target_arch = "wasm32")]
+#![forbid(non_ascii_idents, unsafe_code)]
 
 /// Analog for [`assert_eq`] but for [`js_callback`] macro.
 /// Simply use it as [`assert_eq`]. For use cases and reasons

@@ -174,7 +174,7 @@ impl Receiver {
     /// [`platform::Transceiver`] to this [`Receiver`].
     ///
     /// Sets [`platform::MediaStreamTrack::enabled`] same as
-    /// [`Receiver::enabled_individual`] of this [`Receiver`].
+    /// `enabled_individual` of this [`Receiver`].
     pub fn set_remote_track(
         &self,
         transceiver: platform::Transceiver,

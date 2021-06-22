@@ -719,7 +719,7 @@ window.onload = async function() {
         }
       };
       try {
-        await reconnectHandle.reconnect_with_backoff(3000, 2.0, 10000);
+        await reconnectHandle.reconnect_with_backoff(500, 2, 5000, null);
       } catch (e) {
         console.error('Error in reconnection with backoff:\n' + e.message());
       }

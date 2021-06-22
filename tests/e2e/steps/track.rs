@@ -15,6 +15,7 @@ async fn then_member_has_local_tracks(
     id: String,
     count: u64,
 ) {
+    world.wait_for_interconnection(&id).await.unwrap();
     let member = world.get_member(&id).unwrap();
     let room = member.room();
     let tracks = room.local_tracks().await.unwrap();
@@ -231,7 +232,6 @@ async fn then_member_has_n_remote_tracks_from(
     live_or_stopped: String,
     remote_id: String,
 ) {
-    sleep(Duration::from_millis(300)).await;
     let member = world.get_member(&id).unwrap();
     let connection = member
         .connections()
@@ -245,9 +245,16 @@ async fn then_member_has_n_remote_tracks_from(
         (true, true)
     };
 
-    let actual_count = tracks_store
-        .count_tracks_by_selector(muted, stopped)
-        .await
-        .unwrap();
+    let mut actual_count = 0;
+    for _ in 0..5 {
+        actual_count = tracks_store
+            .count_tracks_by_selector(muted, stopped)
+            .await
+            .unwrap();
+        if actual_count != expected_count {
+            sleep(Duration::from_millis(300)).await;
+        }
+    }
+
     assert_eq!(actual_count, expected_count);
 }

@@ -49,7 +49,7 @@ config = "0.11"
 derive_more = "0.99"
 dotenv = "0.15"
 failure = "0.1"
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 humantime-serde = "1.0"
 medea-client-api-proto = { version = "0.3", features = ["medea"] }
 medea-control-api-proto = { version = "0.3", path = "proto/control-api" }

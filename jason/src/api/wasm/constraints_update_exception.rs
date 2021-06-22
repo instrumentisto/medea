@@ -2,8 +2,6 @@
 //!
 //! [1]: crate::api::RoomHandle::set_local_media_settings
 
-use std::iter::FromIterator as _;
-
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
@@ -39,14 +37,13 @@ impl ConstraintsUpdateException {
     /// [`ConstraintsUpdateException`] represents a `RecoverFailedException`.
     #[must_use]
     pub fn recover_fail_reasons(&self) -> JsValue {
-        js_sys::Array::from_iter(
-            self.0
-                .recover_fail_reasons()
-                .into_iter()
-                .map(Error::from)
-                .map(JsValue::from),
-        )
-        .into()
+        self.0
+            .recover_fail_reasons()
+            .into_iter()
+            .map(Error::from)
+            .map(JsValue::from)
+            .collect::<js_sys::Array>()
+            .into()
     }
 
     /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents

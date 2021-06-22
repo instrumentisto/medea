@@ -107,19 +107,18 @@ mod tests {
 
     #[test]
     fn successful_parse_grpc_url() {
-        for (url, expected_callback_url) in &[
+        for (url, expected_callback_url) in [
             ("grpc://127.0.0.1:9090", "http://127.0.0.1:9090"),
             ("grpc://example.com:9090", "http://example.com:9090"),
             ("grpc://example.com", "http://example.com"),
             ("grpc://127.0.0.1", "http://127.0.0.1"),
         ] {
-            let callback_url =
-                CallbackUrl::try_from((*url).to_string()).unwrap();
+            let callback_url = CallbackUrl::try_from(url.to_string()).unwrap();
             match callback_url {
                 CallbackUrl::Grpc(grpc_callback_url) => {
                     assert_eq!(
-                        grpc_callback_url.addr(),
-                        (*expected_callback_url).to_string()
+                        &grpc_callback_url.addr(),
+                        expected_callback_url,
                     );
                 }
             }
@@ -128,12 +127,12 @@ mod tests {
 
     #[test]
     fn error_on_unsupported_scheme() {
-        for url in &[
+        for url in [
             "asdf://example.com:9090",
             "asdf://127.0.0.1",
             "asdf://127.0.0.1:9090",
         ] {
-            let err = CallbackUrl::try_from((*url).to_string()).unwrap_err();
+            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
             match err {
                 CallbackUrlParseError::UnsupportedScheme => {}
                 _ => {
@@ -145,13 +144,13 @@ mod tests {
 
     #[test]
     fn error_on_url_without_scheme() {
-        for url in &[
+        for url in [
             "127.0.0.1",
             "127.0.0.1:9090",
             "example.com",
             "example.com:9090",
         ] {
-            let err = CallbackUrl::try_from((*url).to_string()).unwrap_err();
+            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
             match err {
                 CallbackUrlParseError::UrlParseErr(e) => match e {
                     ParseError::RelativeUrlWithoutBase => {}

@@ -20,7 +20,7 @@ use uuid::Uuid;
 use crate::{
     browser::{self, WindowFactory},
     control,
-    object::{self, Jason, Object},
+    object::{self, Jason, MediaKind, MediaSourceKind, Object},
 };
 
 pub use self::member::{Builder as MemberBuilder, Member};
@@ -112,7 +112,14 @@ impl World {
         builder: MemberBuilder,
     ) -> Result<()> {
         let mut pipeline = HashMap::new();
+        let mut send_state = HashMap::new();
+        let mut recv_state = HashMap::new();
+
         if builder.is_send {
+            send_state
+                .insert((MediaKind::Audio, MediaSourceKind::Device), true);
+            send_state
+                .insert((MediaKind::Video, MediaSourceKind::Device), true);
             pipeline.insert(
                 "publish".to_owned(),
                 proto::Endpoint::WebRtcPublishEndpoint(
@@ -127,6 +134,10 @@ impl World {
             );
         }
         if builder.is_recv {
+            recv_state
+                .insert((MediaKind::Audio, MediaSourceKind::Device), true);
+            recv_state
+                .insert((MediaKind::Video, MediaSourceKind::Device), true);
             self.members.values().filter(|m| m.is_send()).for_each(|m| {
                 let endpoint_id = format!("play-{}", m.id());
                 pipeline.insert(
@@ -198,7 +209,8 @@ impl World {
         let window = self.window_factory.new_window().await;
         let jason = Object::spawn(Jason, window.clone()).await?;
         let room = jason.init_room().await?;
-        let member = builder.build(room, window).await?;
+        let member =
+            builder.build(room, window, send_state, recv_state).await?;
 
         self.jasons.insert(member.id().to_owned(), jason);
         self.members.insert(member.id().to_owned(), member);
@@ -223,7 +235,6 @@ impl World {
             .get_mut(member_id)
             .ok_or_else(|| Error::MemberNotFound(member_id.to_owned()))?;
         member.join_room(&self.room_id).await?;
-        self.wait_for_interconnection(member_id).await?;
         Ok(())
     }
 
@@ -381,6 +392,25 @@ impl World {
         pair: MembersPair,
     ) -> Result<()> {
         if let Some(publish_endpoint) = pair.left.publish_endpoint() {
+            let left_member = self.members.get_mut(&pair.left.id).unwrap();
+            if publish_endpoint.audio_settings.publish_policy
+                != PublishPolicy::Disabled
+            {
+                left_member.update_send_media_state(
+                    Some(MediaKind::Audio),
+                    None,
+                    true,
+                );
+            }
+            if publish_endpoint.video_settings.publish_policy
+                != PublishPolicy::Disabled
+            {
+                left_member.update_send_media_state(
+                    Some(MediaKind::Video),
+                    None,
+                    true,
+                );
+            }
             self.control_client
                 .create(
                     &control_api_path!(self.room_id, pair.left.id, "publish"),
@@ -389,6 +419,25 @@ impl World {
                 .await?;
         }
         if let Some(publish_endpoint) = pair.right.publish_endpoint() {
+            let right_member = self.members.get_mut(&pair.right.id).unwrap();
+            if publish_endpoint.audio_settings.publish_policy
+                != PublishPolicy::Disabled
+            {
+                right_member.update_send_media_state(
+                    Some(MediaKind::Audio),
+                    None,
+                    true,
+                );
+            }
+            if publish_endpoint.video_settings.publish_policy
+                != PublishPolicy::Disabled
+            {
+                right_member.update_send_media_state(
+                    Some(MediaKind::Video),
+                    None,
+                    true,
+                );
+            }
             self.control_client
                 .create(
                     &control_api_path!(self.room_id, pair.right.id, "publish"),
@@ -400,6 +449,19 @@ impl World {
         if let Some(play_endpoint) =
             pair.left.play_endpoint_for(&self.room_id, &pair.right)
         {
+            let left_member = self.members.get_mut(&pair.left.id).unwrap();
+
+            left_member.update_recv_media_state(
+                Some(MediaKind::Video),
+                None,
+                true,
+            );
+            left_member.update_recv_media_state(
+                Some(MediaKind::Audio),
+                None,
+                true,
+            );
+
             self.control_client
                 .create(
                     &control_api_path!(
@@ -414,6 +476,19 @@ impl World {
         if let Some(play_endpoint) =
             pair.right.play_endpoint_for(&self.room_id, &pair.left)
         {
+            let right_member = self.members.get_mut(&pair.right.id).unwrap();
+
+            right_member.update_recv_media_state(
+                Some(MediaKind::Video),
+                None,
+                true,
+            );
+            right_member.update_recv_media_state(
+                Some(MediaKind::Audio),
+                None,
+                true,
+            );
+
             self.control_client
                 .create(
                     &control_api_path!(

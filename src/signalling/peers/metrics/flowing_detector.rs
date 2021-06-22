@@ -656,20 +656,19 @@ impl PeerStat {
     /// Updates `recv_traffic_state` based on current `receivers` state.
     /// Supposed to be called after you finished updating `receivers`.
     fn update_recv_traffic_state(&mut self) {
-        for track_media_type in &[TrackMediaType::Video, TrackMediaType::Audio]
-        {
-            let media_type = (*track_media_type).into();
+        for track_media_type in [TrackMediaType::Video, TrackMediaType::Audio] {
+            let media_type = track_media_type.into();
             let cnt_flowing = self
                 .receivers
                 .values()
-                .filter(|rx| rx.media_type == *track_media_type)
+                .filter(|rx| rx.media_type == track_media_type)
                 .filter(|rx| rx.is_flowing())
                 .count();
             if cnt_flowing != 0
                 && cnt_flowing
                     >= self
                         .tracks_spec
-                        .get_by_kind(*track_media_type, MediaDirection::Play)
+                        .get_by_kind(track_media_type, MediaDirection::Play)
             {
                 self.recv_traffic_state.started(media_type);
             } else {
@@ -681,20 +680,19 @@ impl PeerStat {
     /// Updates `send_traffic_state` based on current `senders` state. Supposed
     /// to be called after you finished updating `senders`.
     fn update_send_traffic_state(&mut self) {
-        for track_media_type in &[TrackMediaType::Video, TrackMediaType::Audio]
-        {
-            let media_type = (*track_media_type).into();
+        for track_media_type in [TrackMediaType::Video, TrackMediaType::Audio] {
+            let media_type = track_media_type.into();
             let cnt_flowing = self
                 .senders
                 .values()
-                .filter(|rx| rx.media_type == *track_media_type)
+                .filter(|rx| rx.media_type == track_media_type)
                 .filter(|rx| rx.is_flowing())
                 .count();
             if cnt_flowing != 0
                 && cnt_flowing
                     >= self
                         .tracks_spec
-                        .get_by_kind(*track_media_type, MediaDirection::Publish)
+                        .get_by_kind(track_media_type, MediaDirection::Publish)
             {
                 self.send_traffic_state.started(media_type);
             } else {
@@ -705,7 +703,6 @@ impl PeerStat {
 
     /// Returns last update time of the tracks with provided [`MediaDirection`]
     /// and [`MediaType`].
-    #[allow(clippy::filter_map)]
     fn get_tracks_last_update(
         &self,
         direction: MediaDirection,

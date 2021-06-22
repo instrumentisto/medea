@@ -388,7 +388,7 @@ impl Handler<TrafficFlows> for PeersTrafficWatcherImpl {
                             room.handler.peer_started(peer.peer_id);
                         }
                     }
-                    _ => (),
+                    PeerState::Started => (),
                 }
             }
         }

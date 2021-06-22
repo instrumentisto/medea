@@ -580,8 +580,8 @@ mod tests {
         meter.add_packets_lost(StatId::from("111"), 0);
         meter.add_packets_sent(StatId::from("111"), 1000);
         meter.add_rtt(Duration::from_millis(0));
-        for jitter in &[0, 0, 0] {
-            meter.add_jitter(Duration::from_millis(*jitter));
+        for jitter in [0, 0, 0] {
+            meter.add_jitter(Duration::from_millis(jitter));
         }
 
         assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::High);
@@ -591,10 +591,10 @@ mod tests {
     fn regular_normal_call() {
         let mut meter = QualityMeter::new(STATS_TTL);
 
-        for jitter in &[0, 10, 12, 10] {
-            meter.add_jitter(Duration::from_millis(*jitter));
+        for jitter in [0, 10, 12, 10] {
+            meter.add_jitter(Duration::from_millis(jitter));
         }
-        for (packet_lost, packets_received) in &[
+        for (packet_lost, packets_received) in [
             (0, 45),
             (0, 50),
             (0, 95),
@@ -603,11 +603,11 @@ mod tests {
             (0, 158),
             (0, 197),
         ] {
-            meter.add_packets_lost(StatId::from("a"), *packet_lost);
-            meter.add_packets_sent(StatId::from("a"), *packets_received);
+            meter.add_packets_lost(StatId::from("a"), packet_lost);
+            meter.add_packets_sent(StatId::from("a"), packets_received);
         }
-        for rtt in &[20, 30, 20, 30] {
-            meter.add_rtt(Duration::from_millis(*rtt));
+        for rtt in [20, 30, 20, 30] {
+            meter.add_rtt(Duration::from_millis(rtt));
         }
 
         assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::High);
@@ -617,10 +617,10 @@ mod tests {
     fn bad_call() {
         let mut meter = QualityMeter::new(STATS_TTL);
 
-        for jitter in &[10, 20, 15, 16, 11] {
-            meter.add_jitter(Duration::from_millis(*jitter));
+        for jitter in [10, 20, 15, 16, 11] {
+            meter.add_jitter(Duration::from_millis(jitter));
         }
-        for (packet_lost, packets_sent) in &[
+        for (packet_lost, packets_sent) in [
             (3, 45),
             (6, 50),
             (7, 95),
@@ -630,11 +630,11 @@ mod tests {
             (15, 197),
             (19, 217),
         ] {
-            meter.add_packets_lost(StatId::from("a"), *packet_lost);
-            meter.add_packets_sent(StatId::from("a"), *packets_sent);
+            meter.add_packets_lost(StatId::from("a"), packet_lost);
+            meter.add_packets_sent(StatId::from("a"), packets_sent);
         }
-        for rtt in &[150, 160, 170, 150] {
-            meter.add_rtt(Duration::from_millis(*rtt));
+        for rtt in [150, 160, 170, 150] {
+            meter.add_rtt(Duration::from_millis(rtt));
         }
 
         assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::Low);
@@ -646,8 +646,8 @@ mod tests {
         meter.add_packets_lost(StatId::from("a"), 100);
         meter.add_packets_sent(StatId::from("a"), 100);
         meter.add_rtt(Duration::from_millis(1000));
-        for jitter in &[10, 1000, 3000] {
-            meter.add_jitter(Duration::from_millis(*jitter));
+        for jitter in [10, 1000, 3000] {
+            meter.add_jitter(Duration::from_millis(jitter));
         }
 
         assert_eq!(meter.calculate().unwrap(), ConnectionQualityScore::Poor);

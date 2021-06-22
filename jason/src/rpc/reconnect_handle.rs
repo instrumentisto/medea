@@ -68,48 +68,57 @@ impl ReconnectHandle {
     /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
     /// delay.
     ///
-    /// The first attempt to reconnect is guaranteed to happen no earlier than
-    /// `starting_delay_ms`.
+    /// The first attempt will be performed immediately, and the second attempt
+    /// will be performed after `starting_delay_ms`.
     ///
-    /// Also, it guarantees that delay between reconnection attempts won't be
-    /// greater than `max_delay_ms`.
+    /// Delay between reconnection attempts won't be greater than
+    /// `max_delay_ms`.
     ///
     /// After each reconnection attempt, delay between reconnections will be
     /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
+    ///
+    /// If `multiplier` is a negative number then it will be considered as
+    /// `0.0`. This might cause a busy loop, so it's not recommended.
+    ///
+    /// Max elapsed time can be limited with an optional `max_elapsed_time_ms`
+    /// argument.
     ///
     /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     ///
-    /// If `multiplier` is negative number than `multiplier` will be considered
-    /// as `0.0`.
-    ///
     /// # Errors
     ///
     /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`ReconnectError::Session`] if error while reconnecting has
+    /// occurred and `max_elapsed_time_ms` is provided.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
         multiplier: f64,
         max_delay: u32,
+        max_elapsed_time_ms: Option<u32>,
     ) -> Result<(), Traced<ReconnectError>> {
-        let mut backoff_delayer = BackoffDelayer::new(
-            Duration::from_millis(u64::from(starting_delay_ms)),
+        BackoffDelayer::new(
+            Duration::from_millis(starting_delay_ms.into()),
             multiplier,
-            Duration::from_millis(u64::from(max_delay)),
-        );
-        backoff_delayer.delay().await;
-        while self
-            .0
-            .upgrade()
-            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?
-            .reconnect()
-            .await
-            .is_err()
-        {
-            backoff_delayer.delay().await;
-        }
-
-        Ok(())
+            Duration::from_millis(max_delay.into()),
+            max_elapsed_time_ms.map(|val| Duration::from_millis(val.into())),
+        )
+        .retry(|| async {
+            self.0
+                .upgrade()
+                .ok_or_else(|| {
+                    backoff::Error::Permanent(tracerr::new!(
+                        ReconnectError::Detached
+                    ))
+                })?
+                .reconnect()
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+                .map_err(backoff::Error::Transient)
+        })
+        .await
     }
 }

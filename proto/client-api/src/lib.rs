@@ -25,7 +25,7 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
-#![forbid(unsafe_code)]
+#![forbid(non_ascii_idents, unsafe_code)]
 
 pub mod state;
 pub mod stats;

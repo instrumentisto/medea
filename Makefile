@@ -21,8 +21,8 @@ IMAGE_NAME := $(strip \
 	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
 	$(image))))
 
-RUST_VER := 1.52
-CHROME_VERSION := 90.0
+RUST_VER := 1.53
+CHROME_VERSION := 91.0
 FIREFOX_VERSION := 88.0.1
 
 CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
