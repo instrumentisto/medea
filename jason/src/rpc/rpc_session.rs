@@ -58,14 +58,47 @@ pub enum SessionError {
     SessionUnexpectedlyDropped,
 
     /// [`WebSocketRpcClient`] lost connection with a server.
-    #[display(fmt = "Connection with a server was lost")]
-    ConnectionLost,
+    #[display(fmt = "Connection with a server was lost: {}", _0)]
+    ConnectionLost(ConnectionLostReason),
 
     /// [`WebSocketRpcSession::connect`] called while connecting to the server.
     ///
     /// So old connection process was canceled.
     #[display(fmt = "New connection info was provided")]
     NewConnectionInfo,
+}
+
+/// Reason of why a [`RpcSession`] lost connection with a server.
+#[derive(Clone, Debug, Display)]
+pub enum ConnectionLostReason {
+    /// Connection could not be established because
+    /// [`WebSocketRpcClient::connect()`] failed.
+    ConnectError(Traced<RpcClientError>),
+
+    /// Underlying [`WebSocketRpcClient`] reported that connection was lost.
+    Lost(super::ConnectionLostReason),
+}
+
+impl JsCaused for ConnectionLostReason {
+    type Error = platform::Error;
+
+    #[inline]
+    fn name(&self) -> &'static str {
+        match self {
+            ConnectionLostReason::ConnectError(_) => "ConnectError",
+            ConnectionLostReason::Lost(_) => "Lost",
+        }
+    }
+
+    #[inline]
+    fn js_cause(self) -> Option<Self::Error> {
+        match self {
+            ConnectionLostReason::ConnectError(err) => {
+                err.into_inner().js_cause()
+            }
+            ConnectionLostReason::Lost(_) => None,
+        }
+    }
 }
 
 /// Client to talk with server via Client API RPC.
@@ -225,13 +258,8 @@ impl WebSocketRpcSession {
                 S::Initialized(_) => {
                     return Err(tracerr::new!(E::NewConnectionInfo));
                 }
-                S::Lost(err, _) => {
-                    // TODO: Clone Traced and add new Frame to it when Traced
-                    //       cloning will be implemented.
-                    return Err(tracerr::new!(AsRef::<SessionError>::as_ref(
-                        &err.as_ref()
-                    )
-                    .clone()));
+                S::Lost(reason, _) => {
+                    return Err(tracerr::new!(E::ConnectionLost(reason)));
                 }
                 S::Uninitialized => {
                     return Err(tracerr::new!(E::AuthorizationFailed));
@@ -261,13 +289,15 @@ impl WebSocketRpcSession {
                         match Rc::clone(&this.client)
                             .connect(info.url.clone())
                             .await
-                            .map_err(tracerr::map_from_and_wrap!())
                         {
                             Ok(_) => {
                                 this.state.set(S::Authorizing(info));
                             }
                             Err(e) => {
-                                this.state.set(S::Lost(Rc::new(e), info));
+                                this.state.set(S::Lost(
+                                    ConnectionLostReason::ConnectError(e),
+                                    info,
+                                ));
                             }
                         }
                     }
@@ -295,7 +325,7 @@ impl WebSocketRpcSession {
         let mut client_on_connection_loss = self.client.on_connection_loss();
         let weak_this = Rc::downgrade(self);
         platform::spawn(async move {
-            while client_on_connection_loss.next().await.is_some() {
+            while let Some(reason) = client_on_connection_loss.next().await {
                 let this = upgrade_or_break!(weak_this);
 
                 let state = this.state.get();
@@ -307,9 +337,7 @@ impl WebSocketRpcSession {
                     | S::Authorizing(info)
                     | S::Opened(info) => {
                         this.state.set(S::Lost(
-                            Rc::new(tracerr::new!(
-                                SessionError::ConnectionLost
-                            )),
+                            ConnectionLostReason::Lost(reason),
                             info,
                         ));
                     }
@@ -623,7 +651,7 @@ pub enum SessionState {
 
     /// Connection with a server was lost but can be recovered.
     Lost(
-        #[derivative(PartialEq = "ignore")] Rc<Traced<SessionError>>,
+        #[derivative(PartialEq = "ignore")] ConnectionLostReason,
         Rc<ConnectionInfo>,
     ),
 

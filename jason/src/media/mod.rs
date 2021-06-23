@@ -17,7 +17,10 @@ pub use self::{
         MultiSourceTracksConstraints, RecvConstraints, TrackConstraints,
         VideoSource, VideoTrackConstraints,
     },
-    manager::{MediaManager, MediaManagerError, MediaManagerHandle},
+    manager::{
+        EnumerateDevicesError, GetDisplayMediaError, GetUserMediaError,
+        InitLocalTracksError, MediaManager, MediaManagerHandle,
+    },
     track::MediaSourceKind,
 };
 

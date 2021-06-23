@@ -251,7 +251,7 @@ impl RpcTransport for WebSocketRpcTransport {
     fn send(&self, msg: &ClientMsg) -> Result<()> {
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
-            .map_err(|e| TransportError::ParseClientMessage(e.into()))
+            .map_err(|e| TransportError::SerializeClientMessage(e.into()))
             .map_err(tracerr::wrap!())?;
 
         let state = &*inner.socket_state.borrow();

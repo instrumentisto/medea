@@ -11,8 +11,8 @@ use medea_jason::{
     api,
     media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
-        DisplayVideoTrackConstraints, MediaKind, MediaManager,
-        MediaManagerError, MediaStreamSettings,
+        DisplayVideoTrackConstraints, GetUserMediaError, InitLocalTracksError,
+        MediaKind, MediaManager, MediaStreamSettings,
     },
 };
 
@@ -50,7 +50,7 @@ async fn failed_get_media_devices_info() {
         Ok(_) => assert!(false),
         Err(err) => {
             let e = get_jason_error(err);
-            assert_eq!(e.name(), "EnumerateDevicesFailed");
+            assert_eq!(e.name(), "EnumerateDevicesError");
             assert_eq!(
                 e.message(),
                 "MediaDevices.enumerateDevices() failed: Unknown JS error: \
@@ -84,8 +84,8 @@ async fn failed_get_user_media() {
             assert_eq!(err.name(), "GetUserMediaFailed");
             assert_eq!(
                 err.message(),
-                "MediaDevices.getUserMedia() failed: Unknown JS error: \
-                 failed_get_user_media",
+                "Failed to get local tracks: MediaDevices.getUserMedia() \
+                 failed: Unknown JS error: failed_get_user_media",
             );
         }
     }
@@ -119,8 +119,9 @@ async fn failed_get_user_media2() {
             assert_eq!(err.name(), "GetUserMediaFailed");
             assert_eq!(
                 err.message(),
-                "MediaDevices.getUserMedia() failed: \
-                 get_user_media_error_name: get_user_media_error_message",
+                "Failed to get local tracks: MediaDevices.getUserMedia() \
+                 failed: get_user_media_error_name: \
+                 get_user_media_error_message",
             );
         }
     }
@@ -351,7 +352,9 @@ async fn new_tracks_should_be_live() {
         let err = err.into_inner();
         assert!(matches!(
             err,
-            MediaManagerError::LocalTrackIsEnded(MediaKind::Audio)
+            InitLocalTracksError::GetUserMediaFailed(
+                GetUserMediaError::LocalTrackIsEnded(MediaKind::Audio)
+            )
         ));
     } else {
         panic!("expected err");

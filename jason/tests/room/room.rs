@@ -140,11 +140,11 @@ async fn error_get_local_stream_on_new_peer() {
     .unwrap();
 
     let (cb, test_result) = js_callback!(|err: api::Error| {
-        cb_assert_eq!(&err.name(), "MediaManager");
+        cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
         cb_assert_eq!(
             &err.message(),
-            "MediaDevices.getUserMedia() failed: Unknown JS error: \
-             error_get_local_stream_on_new_peer"
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: error_get_local_stream_on_new_peer"
         );
     });
 
@@ -1837,7 +1837,7 @@ async fn no_updates_sent_if_gum_fails_on_enable() {
         .await
         .unwrap_err();
     let e = get_jason_error(err);
-    assert_eq!(e.name(), "MediaManagerError");
+    assert_eq!(e.name(), "CouldNotGetLocalMedia");
     assert_eq!(
         e.message(),
         "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
@@ -2181,7 +2181,7 @@ mod set_local_media_settings {
         let room_handle = api::RoomHandle::from(room.new_handle());
 
         let (cb, test_result) = js_callback!(|err: api::Error| {
-            cb_assert_eq!(&err.name(), "MediaConnections");
+            cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
             cb_assert_eq!(
                 err.message(),
                 "MediaExchangeState of Sender can't be transited into \
@@ -2227,7 +2227,7 @@ mod set_local_media_settings {
     #[wasm_bindgen_test]
     async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         let (cb, test_result) = js_callback!(|err: api::Error| {
-            cb_assert_eq!(&err.name(), "TracksRequest");
+            cb_assert_eq!(&err.name(), "InvalidLocalTracks");
             cb_assert_eq!(
                 &err.message(),
                 "provided multiple device video MediaStreamTracks"
@@ -2256,8 +2256,7 @@ mod set_local_media_settings {
         assert_eq!(err.name(), "InvalidLocalTracks");
         assert_eq!(
             err.message(),
-            "Invalid local tracks: provided multiple device video \
-             MediaStreamTracks"
+            "provided multiple device video MediaStreamTracks"
         );
 
         wait_and_check_test_result(test_result, || {}).await;

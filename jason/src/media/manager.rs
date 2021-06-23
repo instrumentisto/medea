@@ -6,7 +6,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use derive_more::Display;
+use derive_more::{Display, From, Into};
 use medea_client_api_proto::MediaSourceKind;
 use tracerr::Traced;
 
@@ -21,43 +21,100 @@ use crate::{
 
 use super::track::local;
 
-/// Errors that may occur in a [`MediaManager`].
-#[derive(Clone, Debug, Display, JsCaused)]
+/// Errors returned from the [`MediaManagerHandle::enumerate_devices()`] method.
+#[derive(Clone, Debug, Display, From, JsCaused, Into)]
 #[js(error = "platform::Error")]
-pub enum MediaManagerError {
-    /// Occurs if the [getUserMedia][1] request failed.
+#[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
+pub struct EnumerateDevicesError(platform::Error);
+
+/// Errors returned from the [`MediaManagerHandle::init_local_tracks()`] method.
+#[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum InitLocalTracksError {
+    /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be upgraded.
+    #[display(fmt = "MediaManagerHandle is in detached state")]
+    Detached,
+
+    /// Occurs if the [getUserMedia][1] request fails.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    #[display(fmt = "Failed to get local tracks: {}", _0)]
+    GetUserMediaFailed(#[js(cause)] GetUserMediaError),
+
+    /// Occurs if the [getDisplayMedia()][1] request fails.
+    ///
+    /// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "Failed to get local tracks: {}", _0)]
+    GetDisplayMediaFailed(#[js(cause)] GetDisplayMediaError),
+}
+
+/// Error occurring when [`local::Track`] was [`ended`][1] right after
+/// [getUserMedia()][2] or [getDisplayMedia()][3] request.
+///
+/// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+/// [2]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
+/// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+#[derive(Clone, Debug, Display)]
+#[display(fmt = "{} track is ended", _0)]
+struct LocalTrackIsEndedError(MediaKind);
+
+/// Errors occurring when [getUserMedia()][1] request fails.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
+#[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum GetUserMediaError {
+    /// [getUserMedia()][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
-    GetUserMediaFailed(platform::Error),
+    PlatformRequestFailed(platform::Error),
 
-    /// Occurs if the [getDisplayMedia()][1] request failed.
-    ///
-    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
-    GetDisplayMediaFailed(platform::Error),
-
-    /// Occurs when cannot get info about connected [MediaDevices][1].
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
-    #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
-    EnumerateDevicesFailed(platform::Error),
-
-    /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
-    /// or [getDisplayMedia()][3] request.
+    /// [`local::Track`] was [`ended`][1] right after [getUserMedia()][2] or
+    /// [getDisplayMedia()][3] request.
     ///
     /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/rnxcavf
     /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-    #[display(fmt = "{} track is ended", _0)]
+    #[display(fmt = "New {} local track was ended", _0)]
     LocalTrackIsEnded(MediaKind),
-
-    /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be upgraded.
-    #[display(fmt = "MediaManagerHandle is in detached state")]
-    Detached,
 }
 
-type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
+impl From<LocalTrackIsEndedError> for GetUserMediaError {
+    #[inline]
+    fn from(err: LocalTrackIsEndedError) -> Self {
+        Self::LocalTrackIsEnded(err.0)
+    }
+}
+
+/// Error occurring when [getDisplayMedia()][1] request fails.
+///
+/// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+#[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum GetDisplayMediaError {
+    /// [getDisplayMedia()][1] request failed.
+    ///
+    /// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
+    PlatformRequestFailed(platform::Error),
+
+    /// [`local::Track`] was [`ended`][1] right after [getUserMedia()][2] or
+    /// [getDisplayMedia()][3] request.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "New {} local track was ended", _0)]
+    LocalTrackIsEnded(MediaKind),
+}
+
+impl From<LocalTrackIsEndedError> for GetDisplayMediaError {
+    #[inline]
+    fn from(err: LocalTrackIsEndedError) -> Self {
+        Self::LocalTrackIsEnded(err.0)
+    }
+}
 
 /// [`MediaManager`] performs all media acquisition requests
 /// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
@@ -68,7 +125,7 @@ type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 /// then this track is stopped and deleted from [`MediaManager`].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
-/// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+/// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
 #[derive(Default)]
 pub struct MediaManager(Rc<InnerMediaManager>);
 
@@ -82,8 +139,11 @@ struct InnerMediaManager {
 impl InnerMediaManager {
     /// Returns a list of [`platform::InputDeviceInfo`] objects.
     #[inline]
-    async fn enumerate_devices() -> Result<Vec<platform::InputDeviceInfo>> {
-        platform::enumerate_devices().await
+    async fn enumerate_devices(
+    ) -> Result<Vec<platform::InputDeviceInfo>, Traced<platform::Error>> {
+        platform::enumerate_devices()
+            .await
+            .map_err(tracerr::wrap!())
     }
 
     /// Obtains [`local::Track`]s based on a provided
@@ -93,18 +153,19 @@ impl InnerMediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// With [`InitLocalTracksError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.
     ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// With [`InitLocalTracksError::GetDisplayMediaFailed`] if
     /// [getDisplayMedia()][2] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     async fn get_tracks(
         &self,
         mut caps: MediaStreamSettings,
-    ) -> Result<Vec<(Rc<local::Track>, bool)>> {
+    ) -> Result<Vec<(Rc<local::Track>, bool)>, Traced<InitLocalTracksError>>
+    {
         let tracks_from_storage = self
             .get_from_storage(&mut caps)
             .into_iter()
@@ -115,7 +176,8 @@ impl InnerMediaManager {
                 Ok(tracks_from_storage
                     .chain(
                         self.get_display_media(caps)
-                            .await?
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?
                             .into_iter()
                             .map(|t| (t, true)),
                     )
@@ -125,7 +187,8 @@ impl InnerMediaManager {
                 Ok(tracks_from_storage
                     .chain(
                         self.get_user_media(caps)
-                            .await?
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?
                             .into_iter()
                             .map(|t| (t, true)),
                     )
@@ -135,9 +198,14 @@ impl InnerMediaManager {
                 device_caps,
                 display_caps,
             )) => {
-                let device_tracks = self.get_user_media(device_caps).await?;
-                let display_tracks =
-                    self.get_display_media(display_caps).await?;
+                let device_tracks = self
+                    .get_user_media(device_caps)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
+                let display_tracks = self
+                    .get_display_media(display_caps)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
                 Ok(tracks_from_storage
                     .chain(
                         device_tracks
@@ -155,7 +223,7 @@ impl InnerMediaManager {
     /// [getUserMedia()][1]/[getDisplayMedia()][2] calls.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     fn get_from_storage(
         &self,
         caps: &mut MediaStreamSettings,
@@ -205,10 +273,16 @@ impl InnerMediaManager {
     async fn get_user_media(
         &self,
         caps: platform::MediaStreamConstraints,
-    ) -> Result<Vec<Rc<local::Track>>> {
-        let tracks = platform::get_user_media(caps).await?;
+    ) -> Result<Vec<Rc<local::Track>>, Traced<GetUserMediaError>> {
+        let tracks = platform::get_user_media(caps)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
 
-        Ok(self.parse_and_save_tracks(tracks, MediaSourceKind::Device)?)
+        let tracks = self
+            .parse_and_save_tracks(tracks, MediaSourceKind::Device)
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(tracks)
     }
 
     /// Obtains [`local::Track`]s making [getDisplayMedia()][1] call, saves
@@ -219,10 +293,16 @@ impl InnerMediaManager {
     async fn get_display_media(
         &self,
         caps: platform::DisplayMediaStreamConstraints,
-    ) -> Result<Vec<Rc<local::Track>>> {
-        let tracks = platform::get_display_media(caps).await?;
+    ) -> Result<Vec<Rc<local::Track>>, Traced<GetDisplayMediaError>> {
+        let tracks = platform::get_display_media(caps)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
 
-        Ok(self.parse_and_save_tracks(tracks, MediaSourceKind::Display)?)
+        let track = self
+            .parse_and_save_tracks(tracks, MediaSourceKind::Display)
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(track)
     }
 
     /// Retrieves tracks from provided [`platform::MediaStreamTrack`]s, saves
@@ -230,8 +310,8 @@ impl InnerMediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
-    /// the provided [`platform::MediaStreamTrack`]s is in [`ended`][1] state.
+    /// With [`LocalTrackIsEndedError`] if at least one track from the provided
+    /// [`platform::MediaStreamTrack`]s is in [`ended`][1] state.
     ///
     /// In case of error all tracks are ended and are not saved in
     /// [`MediaManager`]'s tracks storage.
@@ -242,9 +322,7 @@ impl InnerMediaManager {
         &self,
         tracks: Vec<platform::MediaStreamTrack>,
         kind: MediaSourceKind,
-    ) -> Result<Vec<Rc<local::Track>>> {
-        use MediaManagerError::LocalTrackIsEnded;
-
+    ) -> Result<Vec<Rc<local::Track>>, Traced<LocalTrackIsEndedError>> {
         let mut storage = self.tracks.borrow_mut();
 
         // Tracks returned by getDisplayMedia()/getUserMedia() request should be
@@ -252,7 +330,9 @@ impl InnerMediaManager {
         // `MediaManager`. Tracks will be stopped on `Drop`.
         for track in &tracks {
             if track.ready_state() != MediaStreamTrackState::Live {
-                return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
+                return Err(tracerr::new!(LocalTrackIsEndedError(
+                    track.kind()
+                )));
             }
         }
 
@@ -275,10 +355,10 @@ impl MediaManager {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// With [`InitLocalTracksError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.
     ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// With [`InitLocalTracksError::GetDisplayMediaFailed`] if
     /// [getDisplayMedia()][2] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -286,8 +366,12 @@ impl MediaManager {
     pub async fn get_tracks<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
-    ) -> Result<Vec<(Rc<local::Track>, bool)>> {
-        self.0.get_tracks(caps.into()).await
+    ) -> Result<Vec<(Rc<local::Track>, bool)>, Traced<InitLocalTracksError>>
+    {
+        self.0
+            .get_tracks(caps.into())
+            .await
+            .map_err(tracerr::wrap!())
     }
 
     /// Instantiates a new [`MediaManagerHandle`] for external usage.
@@ -321,14 +405,14 @@ impl MediaManagerHandle {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::EnumerateDevicesFailed`] if devices
-    /// enumeration failed.
+    /// See [`EnumerateDevicesError`] for details.
     pub async fn enumerate_devices(
         &self,
-    ) -> Result<Vec<platform::InputDeviceInfo>> {
+    ) -> Result<Vec<platform::InputDeviceInfo>, Traced<EnumerateDevicesError>>
+    {
         InnerMediaManager::enumerate_devices()
             .await
-            .map_err(tracerr::wrap!(=> MediaManagerError))
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Returns [`local::LocalMediaTrack`]s objects, built from the provided
@@ -336,24 +420,18 @@ impl MediaManagerHandle {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
-    /// request failed.
-    ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
-    /// [getDisplayMedia()][2] request failed.
+    /// See [`InitLocalTracksError`] for details.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     pub async fn init_local_tracks(
         &self,
         caps: MediaStreamSettings,
-    ) -> Result<Vec<local::LocalMediaTrack>> {
+    ) -> Result<Vec<local::LocalMediaTrack>, Traced<InitLocalTracksError>> {
         let this = self
             .0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(MediaManagerError::Detached))?;
+            .ok_or_else(|| tracerr::new!(InitLocalTracksError::Detached))?;
         this.get_tracks(caps)
             .await
             .map(|tracks| {
@@ -362,6 +440,6 @@ impl MediaManagerHandle {
                     .map(|(t, _)| local::LocalMediaTrack::new(t))
                     .collect::<Vec<_>>()
             })
-            .map_err(tracerr::wrap!(=> MediaManagerError))
+            .map_err(tracerr::map_from_and_wrap!())
     }
 }

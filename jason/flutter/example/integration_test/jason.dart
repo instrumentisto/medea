@@ -32,12 +32,18 @@ void main() {
   });
 
   testWidgets('MediaManager', (WidgetTester tester) async {
-    final returnsMediaManagerException =
+    final returnsLocalMediaInitException =
         dl.lookupFunction<Result Function(Handle), Result Function(Object)>(
-            'returns_media_manager_exception');
-    final returnsFutureWithMediaManagerException =
+            'returns_local_media_init_exception');
+    final returnsFutureWithLocalMediaInitException =
         dl.lookupFunction<Handle Function(Handle), Object Function(Object)>(
-            'returns_future_with_media_manager_exception');
+            'returns_future_with_local_media_init_exception');
+    final returnsEnumerateDevicesException =
+        dl.lookupFunction<Result Function(Handle), Result Function(Object)>(
+            'returns_enumerate_devices_exception');
+    final returnsFutureWithEnumerateDevicesException =
+        dl.lookupFunction<Handle Function(Handle), Object Function(Object)>(
+            'returns_future_enumerate_devices_exception');
 
     var jason = Jason();
     var mediaManager = jason.mediaManager();
@@ -68,26 +74,47 @@ void main() {
     expect(() => tracks.first.kind(), throwsStateError);
 
     expect(
-        () => returnsMediaManagerException('Dart err cause1').unwrap(),
+        () => returnsLocalMediaInitException('Dart err cause1').unwrap(),
         throwsA(predicate((e) =>
-            e is MediaManagerException &&
-            e.kind == MediaManagerExceptionKind.GetUserMediaFailed &&
+            e is LocalMediaInitException &&
+            e.kind == LocalMediaInitExceptionKind.GetUserMediaFailed &&
             e.cause == 'Dart err cause1' &&
             e.nativeStackTrace.contains('at jason/src'))));
 
     var err;
     try {
-      await (returnsFutureWithMediaManagerException('Dart err cause2')
+      await (returnsFutureWithLocalMediaInitException('Dart err cause2')
           as Future);
     } catch (e) {
-      err = e as MediaManagerException;
+      err = e as LocalMediaInitException;
     }
     expect(
         err,
         predicate((e) =>
-            e is MediaManagerException &&
-            e.kind == MediaManagerExceptionKind.GetDisplayMediaFailed &&
+            e is LocalMediaInitException &&
+            e.kind == LocalMediaInitExceptionKind.GetDisplayMediaFailed &&
             e.cause == 'Dart err cause2' &&
+            e.nativeStackTrace.contains('at jason/src')));
+
+    expect(
+        () => returnsEnumerateDevicesException('Dart err cause3').unwrap(),
+        throwsA(predicate((e) =>
+            e is EnumerateDevicesException &&
+            e.cause == 'Dart err cause3' &&
+            e.nativeStackTrace.contains('at jason/src'))));
+
+    var err2;
+    try {
+      await (returnsFutureWithEnumerateDevicesException('Dart err cause4')
+          as Future);
+    } catch (e) {
+      err2 = e as EnumerateDevicesException;
+    }
+    expect(
+        err2,
+        predicate((e) =>
+            e is EnumerateDevicesException &&
+            e.cause == 'Dart err cause4' &&
             e.nativeStackTrace.contains('at jason/src')));
   });
 

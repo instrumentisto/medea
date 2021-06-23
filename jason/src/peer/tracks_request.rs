@@ -20,7 +20,7 @@ use crate::{
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`local::Track`]s.
-#[derive(Clone, Debug, Display, JsCaused)]
+#[derive(Clone, Debug, Display, Eq, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
 pub enum TracksRequestError {
     /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
@@ -67,8 +67,6 @@ pub enum TracksRequestError {
     )]
     InvalidVideoTrack,
 }
-
-type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
@@ -140,7 +138,8 @@ impl SimpleTracksRequest {
     pub fn parse_tracks(
         &self,
         tracks: Vec<Rc<local::Track>>,
-    ) -> Result<HashMap<TrackId, Rc<local::Track>>> {
+    ) -> Result<HashMap<TrackId, Rc<local::Track>>, Traced<TracksRequestError>>
+    {
         use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let mut parsed_tracks = HashMap::new();
@@ -218,7 +217,7 @@ impl SimpleTracksRequest {
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<TracksRequestError>> {
         let other = other.into();
 
         if let Some((_, audio_caps)) = &self.audio {
@@ -279,9 +278,7 @@ impl SimpleTracksRequest {
 impl TryFrom<TracksRequest> for SimpleTracksRequest {
     type Error = TracksRequestError;
 
-    fn try_from(
-        value: TracksRequest,
-    ) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: TracksRequest) -> Result<Self, Self::Error> {
         use TracksRequestError::{
             NoTracks, TooManyAudioTracks, TooManyDeviceVideoTracks,
             TooManyDisplayVideoTracks,

@@ -13,11 +13,8 @@ use futures::{
 use medea_reactive::{Processed, ProgressableCell};
 
 use crate::{
-    peer::media::{
-        transitable_state::{
-            media_exchange_state, mute_state, InStable, InTransition,
-        },
-        MediaConnectionsError, Result,
+    peer::media::transitable_state::{
+        media_exchange_state, mute_state, InStable, InTransition,
     },
     platform,
     utils::{resettable_delay_for, ResettableDelayHandle},
@@ -198,16 +195,15 @@ where
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`]
-    /// is returned if [`TransitableStateController`]'s [`MediaState`] transits
-    /// into the opposite to the `desired_state`.
+    /// With an approved stable [`MediaState`] if transition to the
+    /// `desired_state` cannot be made.
     ///
     /// [`Future`]: std::future::Future
     /// [`MediaState`]: super::MediaState
     pub fn when_media_state_stable(
         &self,
         desired_state: S,
-    ) -> future::LocalBoxFuture<'static, Result<()>> {
+    ) -> future::LocalBoxFuture<'static, Result<(), S>> {
         let mut states = self.state.subscribe();
         async move {
             while let Some(state) = states.next().await {
@@ -215,14 +211,7 @@ where
                 match state {
                     TransitableState::Transition(_) => continue,
                     TransitableState::Stable(s) => {
-                        return if s == desired_state {
-                            Ok(())
-                        } else {
-                            Err(tracerr::new!(
-                                MediaConnectionsError::
-                                MediaStateTransitsIntoOppositeState
-                            ))
-                        }
+                        return if s == desired_state { Ok(()) } else { Err(s) }
                     }
                 }
             }

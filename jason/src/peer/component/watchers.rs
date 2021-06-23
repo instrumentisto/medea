@@ -1,7 +1,8 @@
 //! Implementation of a [`Component`] watchers.
 
-use std::rc::Rc;
+use std::{convert::Infallible, rc::Rc};
 
+use derive_more::{Display, From};
 use futures::{future, StreamExt as _};
 use medea_client_api_proto::{IceCandidate, NegotiationRole, TrackId};
 use medea_macro::watchers;
@@ -12,13 +13,31 @@ use crate::{
     peer::{
         component::{NegotiationState, SyncState},
         media::{receiver, sender},
-        PeerError, PeerEvent,
+        GetMidsError, PeerEvent, RtcPeerConnectionError,
     },
     utils::{transpose_guarded, Updatable as _},
 };
 
 use super::{Component, PeerConnection, State};
 
+/// Errors occurring in watchers of a [`Component`].
+#[derive(Clone, Debug, Display, From)]
+enum PeerWatcherError {
+    /// Errors occurred in platform's [RTCPeerConnection][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
+    RtcPeerConnection(RtcPeerConnectionError),
+
+    /// Failed to acquire a list of `mid`s from a [`PeerConnection`].
+    GetMids(GetMidsError),
+
+    /// Failed to create a [`Sender`].
+    ///
+    /// [`Sender`]: sender::Sender
+    SenderCreateFailed(sender::CreateError),
+}
+
+// TODO: Don't force spawned watchers to return `Result`.
 #[watchers]
 impl Component {
     /// Watcher for the [`State::ice_candidates`] push update.
@@ -31,7 +50,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         _: Rc<State>,
         candidate: IceCandidate,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         peer.add_ice_candidate(
             candidate.candidate,
             candidate.sdp_m_line_index,
@@ -56,7 +75,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         state: Rc<State>,
         description: Guarded<String>,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         let (description, _guard) = description.into_parts();
         if let Some(role) = state.negotiation_role.get() {
             match role {
@@ -88,7 +107,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         _: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         let ((track_id, _), _guard) = val.into_parts();
         peer.remove_track(track_id);
         Ok(())
@@ -103,7 +122,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         _: Rc<State>,
         val: Guarded<(TrackId, Rc<receiver::State>)>,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         let ((track_id, _), _guard) = val.into_parts();
         peer.remove_track(track_id);
         Ok(())
@@ -128,7 +147,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Traced<PeerWatcherError>> {
         let mut wait_futs = vec![state.when_all_receivers_processed().into()];
         if matches!(
             state.negotiation_role.get(),
@@ -142,22 +161,19 @@ impl Component {
         for receiver in new_sender.receivers() {
             peer.connections.create_connection(state.id, receiver);
         }
-        let sender = match sender::Sender::new(
+        let sender = sender::Sender::new(
             &new_sender,
             &peer.media_connections,
             peer.send_constraints.clone(),
             peer.track_events_sender.clone(),
         )
-        .map_err(tracerr::map_from_and_wrap!())
-        {
-            Ok(sender) => sender,
-            Err(e) => {
+        .map_err(|e| {
                 drop(peer.peer_events_sender.unbounded_send(
                     PeerEvent::FailedLocalMedia { error: e.clone() },
                 ));
-                return Err(e);
-            }
-        };
+                e
+        })
+        .map_err(tracerr::map_from_and_wrap!())?;
         peer.media_connections
             .insert_sender(sender::Component::new(sender, new_sender));
         Ok(())
@@ -176,7 +192,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<receiver::State>)>,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         let ((_, receiver), _guard) = val.into_parts();
         peer.connections
             .create_connection(state.id, receiver.sender_id());
@@ -213,7 +229,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         state: Rc<State>,
         sdp: String,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Traced<PeerWatcherError>> {
         let _ = state.sync_state.when_eq(SyncState::Synced).await;
         if let Some(role) = state.negotiation_role.get() {
             if state.local_sdp.is_rollback() {
@@ -291,7 +307,7 @@ impl Component {
         _: Rc<PeerConnection>,
         state: Rc<State>,
         _: (),
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         if let Some(negotiation_role) = state.negotiation_role.get() {
             match negotiation_role {
                 NegotiationRole::Offerer => {
@@ -320,7 +336,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         state: Rc<State>,
         negotiation_state: NegotiationState,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         medea_reactive::when_all_processed(vec![
             state.when_all_updated().into(),
             state.when_all_senders_processed().into(),
@@ -373,7 +389,7 @@ impl Component {
         _: Rc<PeerConnection>,
         state: Rc<State>,
         role: NegotiationRole,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         match role {
             NegotiationRole::Offerer => {
                 medea_reactive::when_all_processed(vec![
@@ -427,7 +443,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         _: Rc<State>,
         sync_state: SyncState,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         if let SyncState::Synced = sync_state {
             peer.send_current_connection_states();
         }
@@ -445,7 +461,7 @@ impl Component {
         peer: Rc<PeerConnection>,
         state: Rc<State>,
         _: bool,
-    ) -> Result<(), Traced<PeerError>> {
+    ) -> Result<(), Infallible> {
         state.senders.when_updated().await;
         drop(state.update_local_stream(&peer).await);
 

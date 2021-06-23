@@ -4,12 +4,9 @@
 
 use tracerr::Traced;
 
-use crate::{
-    media::MediaManagerError,
-    platform::{
-        DisplayMediaStreamConstraints, InputDeviceInfo, MediaStreamConstraints,
-        MediaStreamTrack,
-    },
+use crate::platform::{
+    DisplayMediaStreamConstraints, Error, InputDeviceInfo,
+    MediaStreamConstraints, MediaStreamTrack,
 };
 
 /// Collects information about the User Agent's available media input devices.
@@ -23,8 +20,8 @@ use crate::{
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-enumeratedevices
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
-pub async fn enumerate_devices(
-) -> Result<Vec<InputDeviceInfo>, Traced<MediaManagerError>> {
+pub async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>, Traced<Error>>
+{
     unimplemented!()
 }
 
@@ -42,7 +39,7 @@ pub async fn enumerate_devices(
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
 pub async fn get_user_media(
     caps: MediaStreamConstraints,
-) -> Result<Vec<MediaStreamTrack>, Traced<MediaManagerError>> {
+) -> Result<Vec<MediaStreamTrack>, Traced<Error>> {
     unimplemented!()
 }
 
@@ -61,6 +58,6 @@ pub async fn get_user_media(
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
 pub async fn get_display_media(
     caps: DisplayMediaStreamConstraints,
-) -> Result<Vec<MediaStreamTrack>, Traced<MediaManagerError>> {
+) -> Result<Vec<MediaStreamTrack>, Traced<Error>> {
     unimplemented!()
 }

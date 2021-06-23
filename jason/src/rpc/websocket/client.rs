@@ -18,8 +18,8 @@ use tracerr::Traced;
 use crate::{
     platform,
     rpc::{
-        ApiUrl, CloseMsg, CloseReason, ClosedStateReason, Heartbeat,
-        IdleTimeout, PingInterval, RpcClientError,
+        ApiUrl, CloseMsg, CloseReason, ClosedStateReason, ConnectionLostReason,
+        Heartbeat, IdleTimeout, PingInterval, RpcClientError,
     },
 };
 
@@ -110,7 +110,7 @@ struct Inner {
 
     /// Subscribers that will be notified when underlying transport connection
     /// is lost.
-    on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
+    on_connection_loss_subs: Vec<mpsc::UnboundedSender<ConnectionLostReason>>,
 
     /// Closure which will create new [`platform::RpcTransport`]s for this
     /// [`WebSocketRpcClient`] on each
@@ -244,16 +244,15 @@ impl WebSocketRpcClient {
     /// Stops [`Heartbeat`] and notifies all
     /// [`WebSocketRpcClient::on_connection_loss`] subs about connection
     /// loss.
-    fn handle_connection_loss(&self, closed_state_reason: ClosedStateReason) {
-        self.0
-            .borrow()
-            .state
-            .set(ClientState::Closed(closed_state_reason));
+    fn handle_connection_loss(&self, close_msg: ConnectionLostReason) {
+        self.0.borrow().state.set(ClientState::Closed(
+            ClosedStateReason::ConnectionLost(close_msg),
+        ));
         self.0.borrow_mut().heartbeat.take();
         self.0
             .borrow_mut()
             .on_connection_loss_subs
-            .retain(|sub| sub.unbounded_send(()).is_ok());
+            .retain(|sub| sub.unbounded_send(close_msg).is_ok());
     }
 
     /// Handles [`CloseMsg`] from a remote server.
@@ -267,9 +266,7 @@ impl WebSocketRpcClient {
             CloseMsg::Normal(_, reason) => match reason {
                 CloseByServerReason::Reconnected => (),
                 CloseByServerReason::Idle => {
-                    self.handle_connection_loss(
-                        ClosedStateReason::ConnectionLost(close_msg),
-                    );
+                    self.handle_connection_loss(ConnectionLostReason::Idle);
                 }
                 _ => {
                     self.0.borrow_mut().sock.take();
@@ -283,7 +280,7 @@ impl WebSocketRpcClient {
                 }
             },
             CloseMsg::Abnormal(_) => {
-                self.handle_connection_loss(ClosedStateReason::ConnectionLost(
+                self.handle_connection_loss(ConnectionLostReason::WithMessage(
                     close_msg,
                 ));
             }
@@ -304,19 +301,22 @@ impl WebSocketRpcClient {
                 _ => Some(RpcEvent::Event { room_id, event }),
             },
             ServerMsg::RpcSettings(settings) => {
-                self.update_settings(
-                    IdleTimeout(Duration::from_millis(
-                        settings.idle_timeout_ms.into(),
-                    )),
-                    PingInterval(Duration::from_millis(
-                        settings.ping_interval_ms.into(),
-                    )),
-                )
-                .map_err(tracerr::wrap!(=> RpcClientError))
-                .map_err(|e| {
-                    log::error!("Failed to update socket settings: {}", e)
-                })
-                .ok();
+                if let Some(heartbeat) = self.0.borrow_mut().heartbeat.as_ref()
+                {
+                    heartbeat.update_settings(
+                        IdleTimeout(Duration::from_millis(
+                            settings.idle_timeout_ms.into(),
+                        )),
+                        PingInterval(Duration::from_millis(
+                            settings.ping_interval_ms.into(),
+                        )),
+                    );
+                } else {
+                    log::error!(
+                        "Failed to update socket settings because Heartbeat is \
+                         None",
+                    )
+                }
                 None
             }
             ServerMsg::Ping(_) => None,
@@ -351,7 +351,7 @@ impl WebSocketRpcClient {
         platform::spawn(async move {
             while on_idle.next().await.is_some() {
                 if let Some(this) = weak_this.upgrade() {
-                    this.handle_connection_loss(ClosedStateReason::Idle);
+                    this.handle_connection_loss(ConnectionLostReason::Idle);
                 }
             }
         });
@@ -373,10 +373,10 @@ impl WebSocketRpcClient {
         let transport = create_transport_fut.await.map_err(|e| {
             let transport_err = e.into_inner();
             self.0.borrow().state.set(ClientState::Closed(
-                ClosedStateReason::ConnectionFailed(transport_err.clone()),
+                ClosedStateReason::CouldNotEstablish(transport_err.clone()),
             ));
             tracerr::new!(RpcClientError::from(
-                ClosedStateReason::ConnectionFailed(transport_err)
+                ClosedStateReason::CouldNotEstablish(transport_err)
             ))
         })?;
 
@@ -401,7 +401,9 @@ impl WebSocketRpcClient {
             self.0.borrow().state.set(ClientState::Closed(
                 ClosedStateReason::FirstServerMsgIsNotRpcSettings,
             ));
-            return Err(tracerr::new!(RpcClientError::NoSocket));
+            return Err(tracerr::new!(RpcClientError::ConnectionFailed(
+                ClosedStateReason::FirstServerMsgIsNotRpcSettings
+            )));
         }
 
         // subscribe to transport close
@@ -456,22 +458,6 @@ impl WebSocketRpcClient {
             }
         }
         Err(tracerr::new!(RpcClientError::RpcClientGone))
-    }
-
-    /// Updates RPC settings of this [`WebSocketRpcClient`].
-    fn update_settings(
-        &self,
-        idle_timeout: IdleTimeout,
-        ping_interval: PingInterval,
-    ) -> Result<(), Traced<RpcClientError>> {
-        self.0
-            .borrow_mut()
-            .heartbeat
-            .as_ref()
-            .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))
-            .map(|heartbeat| {
-                heartbeat.update_settings(idle_timeout, ping_interval)
-            })
     }
 
     /// Tries to upgrade [`ClientState`] of this [`WebSocketRpcClient`] to
@@ -557,7 +543,9 @@ impl WebSocketRpcClient {
     /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
     /// [`Room`]: crate::room::Room
     /// [`Stream`]: futures::Stream
-    pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
+    pub fn on_connection_loss(
+        &self,
+    ) -> LocalBoxStream<'static, ConnectionLostReason> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_subs.push(tx);
         Box::pin(rx)

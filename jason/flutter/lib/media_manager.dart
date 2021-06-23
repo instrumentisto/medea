@@ -51,7 +51,7 @@ class MediaManagerHandle {
   /// [free] was called on this [MediaManagerHandle], or on a [Jason] that
   /// implicitly owns native object behind this [MediaManagerHandle].
   ///
-  /// Throws a [MediaManagerException] if a request of platform media devices
+  /// Throws a [LocalMediaInitException] if a request of platform media devices
   /// access failed.
   Future<List<LocalMediaTrack>> initLocalTracks(
       MediaStreamSettings caps) async {
@@ -72,8 +72,8 @@ class MediaManagerHandle {
   /// [free] was called on this [MediaManagerHandle], or on a [Jason] that
   /// implicitly owns native object behind this [MediaManagerHandle].
   ///
-  /// Throws a [MediaManagerException] if a request of platform media devices
-  /// access failed.
+  /// Throws a [EnumerateDevicesException] if a request of platform media
+  /// devices access failed.
   Future<List<InputDeviceInfo>> enumerateDevices() async {
     Pointer pointer = await (_enumerateDevices(ptr.getInnerPtr()) as Future);
     return pointer
