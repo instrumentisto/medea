@@ -22,7 +22,7 @@ pub use self::rpc_session::MockRpcSession;
 #[doc(inline)]
 pub use self::{
     backoff_delayer::BackoffDelayer,
-    heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
+    heartbeat::{Heartbeat, IdleTimeout, PingInterval},
     reconnect_handle::{ReconnectError, ReconnectHandle},
     rpc_session::{
         RpcSession, SessionError, SessionState, WebSocketRpcSession,
@@ -168,14 +168,14 @@ pub enum CloseReason {
 /// into a closed state.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClosedStateReason {
-    /// Connection with server was lost.
-    ConnectionLost(CloseMsg),
-
-    /// Error while creating connection between client and server.
-    ConnectionFailed(platform::TransportError),
-
     /// Indicates that connection with server has never been established.
     NeverConnected,
+
+    /// Failed to establish a connection between a client and a server.
+    CouldNotEstablish(platform::TransportError),
+
+    /// Lost a connection with a server.
+    ConnectionLost(ConnectionLostReason),
 
     /// First received [`ServerMsg`] after [`WebSocketRpcClient::connect`] is
     /// not [`ServerMsg::RpcSettings`][1].
@@ -183,6 +183,14 @@ pub enum ClosedStateReason {
     /// [`ServerMsg`]: medea_client_api_proto::ServerMsg
     /// [1]: medea_client_api_proto::ServerMsg::RpcSettings
     FirstServerMsgIsNotRpcSettings,
+}
+
+/// Reason of why [`WebSocketRpcClient`]/[`platform::RpcTransport`] lost
+/// connection with a server.
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
+pub enum ConnectionLostReason {
+    /// Connection has been closed with a close frame and the provided message.
+    WithMessage(CloseMsg),
 
     /// Connection has been inactive for a while and thus considered idle
     /// by a client.
@@ -196,14 +204,6 @@ pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
     RpcTransportError(#[js(cause)] platform::TransportError),
-
-    /// Occurs if the heartbeat cannot be started.
-    #[display(fmt = "Start heartbeat failed: {}", _0)]
-    CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
-
-    /// Occurs if `socket` of [`WebSocketRpcClient`] is unexpectedly `None`.
-    #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
-    NoSocket,
 
     /// Occurs if [`Weak`] pointer to the [`WebSocketRpcClient`] can't be
     /// upgraded to [`Rc`].
@@ -219,17 +219,19 @@ pub enum RpcClientError {
 }
 
 /// Connection with remote was closed.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
     /// Determines by close code `1000` and existence of
     /// [`CloseByServerReason`].
+    #[display(fmt = "Normal. Code: {}, Reason: {}", _0, _1)]
     Normal(u16, CloseByServerReason),
 
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///
     /// Unexpected close determines by non-`1000` close code and for close code
     /// `1000` without reason.
+    #[display(fmt = "Abnormal. Code: {}", _0)]
     Abnormal(u16),
 }

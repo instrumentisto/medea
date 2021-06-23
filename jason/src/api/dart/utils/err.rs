@@ -30,12 +30,20 @@ type NewArgumentErrorCaller = extern "C" fn(
 type NewStateErrorCaller = extern "C" fn(ptr::NonNull<c_char>) -> Dart_Handle;
 
 /// Pointer to an extern function that returns a new Dart
-/// [`MediaManagerException`] with the provided error `kind`, `message`, `cause`
-/// and `stacktrace`.
-type NewMediaManagerExceptionCaller = extern "C" fn(
-    kind: MediaManagerExceptionKind,
+/// [`LocalMediaInitException`] with the provided error `kind`, `message`,
+/// `cause` and `stacktrace`.
+type NewLocalMediaInitExceptionCaller = extern "C" fn(
+    kind: LocalMediaInitExceptionKind,
     message: ptr::NonNull<c_char>,
     cause: DartValue,
+    stacktrace: ptr::NonNull<c_char>,
+) -> Dart_Handle;
+
+/// Pointer to an extern function that returns a new Dart
+/// [`EnumerateDevicesException`] with the provided error `cause` and
+/// `stacktrace`.
+type NewEnumerateDevicesExceptionCaller = extern "C" fn(
+    cause: DartError,
     stacktrace: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
 
@@ -49,11 +57,19 @@ static mut NEW_ARGUMENT_ERROR_CALLER: Option<NewArgumentErrorCaller> = None;
 /// Must be initialized by Dart during FFI initialization phase.
 static mut NEW_STATE_ERROR_CALLER: Option<NewStateErrorCaller> = None;
 
-/// Stores pointer to the [`NewMediaManagerExceptionCaller`] extern function.
+/// Stores pointer to the [`NewLocalMediaInitExceptionCaller`] extern function.
 ///
 /// Must be initialized by Dart during FFI initialization phase.
-static mut NEW_MEDIA_MANAGER_EXCEPTION_CALLER: Option<
-    NewMediaManagerExceptionCaller,
+static mut NEW_LOCAL_MEDIA_INIT_EXCEPTION_CALLER: Option<
+    NewLocalMediaInitExceptionCaller,
+> = None;
+
+/// Stores pointer to the [`NewEnumerateDevicesExceptionCaller`] extern
+/// function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER: Option<
+    NewEnumerateDevicesExceptionCaller,
 > = None;
 
 /// Registers the provided [`NewArgumentErrorCaller`] as
@@ -82,17 +98,30 @@ pub unsafe extern "C" fn register_new_state_error_caller(
     NEW_STATE_ERROR_CALLER = Some(f);
 }
 
-/// Registers the provided [`NewMediaManagerExceptionCaller`] as
-/// [`NEW_MEDIA_MANAGER_EXCEPTION_CALLER`].
+/// Registers the provided [`NewLocalMediaInitExceptionCaller`] as
+/// [`NEW_LOCAL_MEDIA_INIT_EXCEPTION_CALLER`].
 ///
 /// # Safety
 ///
 /// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
-pub unsafe extern "C" fn register_new_media_manager_exception_caller(
-    f: NewMediaManagerExceptionCaller,
+pub unsafe extern "C" fn register_new_local_media_init_exception_caller(
+    f: NewLocalMediaInitExceptionCaller,
 ) {
-    NEW_MEDIA_MANAGER_EXCEPTION_CALLER = Some(f);
+    NEW_LOCAL_MEDIA_INIT_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewLocalMediaInitExceptionCaller`] as
+/// [`NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_enumerate_devices_exception_caller(
+    f: NewEnumerateDevicesExceptionCaller,
+) {
+    NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER = Some(f);
 }
 
 /// An error that can be returned from Rust to Dart.
@@ -188,9 +217,9 @@ impl From<StateError> for DartError {
     }
 }
 
-/// Possible error kinds of a [`MediaManagerException`].
+/// Possible error kinds of a [`LocalMediaInitException`].
 #[repr(u8)]
-pub enum MediaManagerExceptionKind {
+pub enum LocalMediaInitExceptionKind {
     /// Occurs if the [getUserMedia()][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -200,11 +229,6 @@ pub enum MediaManagerExceptionKind {
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     GetDisplayMediaFailed,
-
-    /// Occurs when cannot get info about connected [MediaDevices][1].
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
-    EnumerateDevicesFailed,
 
     /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
     /// or [getDisplayMedia()][3] request.
@@ -216,27 +240,27 @@ pub enum MediaManagerExceptionKind {
 }
 
 /// Exception thrown when accessing media devices.
-pub struct MediaManagerException {
-    /// Concrete error kind of this [`MediaManagerException`].
-    kind: MediaManagerExceptionKind,
+pub struct LocalMediaInitException {
+    /// Concrete error kind of this [`LocalMediaInitException`].
+    kind: LocalMediaInitExceptionKind,
 
     /// Error message describing the problem.
     message: Cow<'static, str>,
 
-    /// [`platform::Error`] that caused this [`MediaManagerException`].
+    /// [`platform::Error`] that caused this [`LocalMediaInitException`].
     cause: Option<platform::Error>,
 
-    /// Stacktrace of this [`MediaManagerException`].
+    /// Stacktrace of this [`LocalMediaInitException`].
     trace: Trace,
 }
 
-impl MediaManagerException {
-    /// Creates a new [`MediaManagerException`] from the provided error `kind`,
-    /// `message`, optional `cause` and `trace`.
+impl LocalMediaInitException {
+    /// Creates a new [`LocalMediaInitException`] from the provided error
+    /// `kind`, `message`, optional `cause` and `trace`.
     #[inline]
     #[must_use]
     pub fn new<M: Into<Cow<'static, str>>>(
-        kind: MediaManagerExceptionKind,
+        kind: LocalMediaInitExceptionKind,
         message: M,
         cause: Option<platform::Error>,
         trace: Trace,
@@ -250,14 +274,45 @@ impl MediaManagerException {
     }
 }
 
-impl From<MediaManagerException> for DartError {
+impl From<LocalMediaInitException> for DartError {
     #[inline]
-    fn from(err: MediaManagerException) -> Self {
+    fn from(err: LocalMediaInitException) -> Self {
         unsafe {
-            Self::new(NEW_MEDIA_MANAGER_EXCEPTION_CALLER.unwrap()(
+            Self::new(NEW_LOCAL_MEDIA_INIT_EXCEPTION_CALLER.unwrap()(
                 err.kind,
                 string_into_c_str(err.message.into_owned()),
                 err.cause.map(DartError::from).into(),
+                string_into_c_str(err.trace.to_string()),
+            ))
+        }
+    }
+}
+
+/// Exception thrown when cannot get info of available media devices.
+pub struct EnumerateDevicesException {
+    /// [`platform::Error`] that caused this [`EnumerateDevicesException`].
+    cause: platform::Error,
+
+    /// Stacktrace of this [`EnumerateDevicesException`].
+    trace: Trace,
+}
+
+impl EnumerateDevicesException {
+    /// Creates a new [`EnumerateDevicesException`] from the provided error
+    /// `cause` and `trace`.
+    #[inline]
+    #[must_use]
+    pub fn new(cause: platform::Error, trace: Trace) -> Self {
+        Self { cause, trace }
+    }
+}
+
+impl From<EnumerateDevicesException> for DartError {
+    #[inline]
+    fn from(err: EnumerateDevicesException) -> Self {
+        unsafe {
+            Self::new(NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER.unwrap()(
+                err.cause.into(),
                 string_into_c_str(err.trace.to_string()),
             ))
         }

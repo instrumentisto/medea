@@ -15,7 +15,7 @@ use super::JasonError;
 #[wasm_bindgen]
 #[derive(Debug, From)]
 #[from(forward)]
-pub struct ConstraintsUpdateException(room::ConstraintsUpdateException);
+pub struct ConstraintsUpdateException(room::ConstraintsUpdateError);
 
 #[wasm_bindgen]
 impl ConstraintsUpdateException {

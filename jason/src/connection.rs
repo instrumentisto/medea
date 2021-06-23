@@ -84,14 +84,11 @@ impl Connections {
     }
 }
 
-/// Errors that may occur in a [`ConnectionHandle`].
+/// Error of [`ConnectionHandle`]'s [`Weak`] pointer being detached.
 #[derive(Clone, Copy, Debug, Display, JsCaused)]
 #[js(error = "platform::Error")]
-pub enum ConnectionError {
-    /// [`ConnectionHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "Connection is in detached state")]
-    Detached,
-}
+#[display(fmt = "ConnectionHandle is in detached state")]
+pub struct HandlerDetachedError;
 
 /// External handler to a [`Connection`] with a remote `Member`.
 ///
@@ -123,14 +120,14 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandlerDetachedError`] for details.
     pub fn on_close(
         &self,
         f: platform::Function<()>,
-    ) -> Result<(), Traced<ConnectionError>> {
+    ) -> Result<(), Traced<HandlerDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
             .map(|inner| inner.on_close.set_func(f))
     }
 
@@ -138,13 +135,13 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandlerDetachedError`] for details.
     pub fn get_remote_member_id(
         &self,
-    ) -> Result<String, Traced<ConnectionError>> {
+    ) -> Result<String, Traced<HandlerDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
             .map(|inner| inner.remote_id.0.clone())
     }
 
@@ -153,14 +150,14 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandlerDetachedError`] for details.
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
-    ) -> Result<(), Traced<ConnectionError>> {
+    ) -> Result<(), Traced<HandlerDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
             .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
@@ -169,14 +166,14 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandlerDetachedError`] for details.
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,
-    ) -> Result<(), Traced<ConnectionError>> {
+    ) -> Result<(), Traced<HandlerDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
             .map(|inner| inner.on_quality_score_update.set_func(f))
     }
 }

@@ -26,11 +26,14 @@ impl From<Traced<ReconnectError>> for DartError {
     #[inline]
     fn from(err: Traced<ReconnectError>) -> Self {
         match err.into_inner() {
-            ReconnectError::Session(_) => {
-                todo!()
-            }
             ReconnectError::Detached => {
                 StateError::new("ReconnectHandle is in detached state.").into()
+            }
+            ReconnectError::ConnectionLost(_)
+            | ReconnectError::AuthorizationFailed
+            | ReconnectError::SessionFinished(_)
+            | ReconnectError::Internal(_) => {
+                todo!()
             }
         }
     }

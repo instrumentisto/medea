@@ -4,8 +4,10 @@ mod component;
 
 use std::{cell::Cell, rc::Rc};
 
+use derive_more::{Display, From};
 use futures::channel::mpsc;
 use medea_client_api_proto::TrackId;
+use tracerr::Traced;
 
 use crate::{
     media::{
@@ -13,15 +15,37 @@ use crate::{
     },
     peer::TrackEvent,
     platform,
+    utils::JsCaused,
 };
 
 use super::{
-    media_exchange_state, mute_state, MediaConnections, MediaConnectionsError,
-    MediaStateControllable, Result,
+    media_exchange_state, mute_state, MediaConnections, MediaStateControllable,
 };
 
 #[doc(inline)]
 pub use self::component::{Component, State};
+
+/// Errors occurring when creating a new [`Sender`].
+#[derive(Clone, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum CreateError {
+    /// [`Sender`] cannot be disabled because it's marked as `required`.
+    #[display(fmt = "MediaExchangeState of Sender cannot transit to \
+                     disabled state, because this Sender is required.")]
+    CannotDisableRequiredSender,
+
+    /// Could not find a [`platform::Transceiver`] by `mid`.
+    #[display(fmt = "Unable to find Transceiver with mid: {}", _0)]
+    TransceiverNotFound(String),
+}
+
+/// Error occuring in [`RTCRtpSender.replaceTrack()`][1] method.
+///
+/// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
+#[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
+#[display(fmt = "MediaManagerHandle is in detached state")]
+pub struct InsertTrackError(platform::Error);
 
 /// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
@@ -42,9 +66,12 @@ impl Sender {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaConnectionsError::TransceiverNotFound`] if [`State`]
-    /// has [`Some`] [`mid`], but this [`mid`] isn't found in the
-    /// [`MediaConnections`].
+    /// With a [`CreateError::TransceiverNotFound`] if [`State`] has [`Some`]
+    /// [`mid`], but this [`mid`] isn't found in the [`MediaConnections`].
+    ///
+    /// With a [`CreateError::CannotDisableRequiredSender`] if the provided
+    /// [`LocalTracksConstraints`] are configured to disable this [`Sender`],
+    /// but it cannot be disabled according to the provide [`State`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn new(
@@ -52,7 +79,7 @@ impl Sender {
         media_connections: &MediaConnections,
         send_constraints: LocalTracksConstraints,
         track_events_sender: mpsc::UnboundedSender<TrackEvent>,
-    ) -> Result<Rc<Self>> {
+    ) -> Result<Rc<Self>, Traced<CreateError>> {
         let enabled_in_cons = send_constraints.enabled(state.media_type());
         let muted_in_cons = send_constraints.muted(state.media_type());
         let media_disabled = state.is_muted()
@@ -61,7 +88,7 @@ impl Sender {
             || muted_in_cons;
         if state.media_type().required() && media_disabled {
             return Err(tracerr::new!(
-                MediaConnectionsError::CannotDisableRequiredSender
+                CreateError::CannotDisableRequiredSender
             ));
         }
 
@@ -88,7 +115,7 @@ impl Sender {
             Some(mid) => connections
                 .get_transceiver_by_mid(mid)
                 .ok_or_else(|| {
-                    MediaConnectionsError::TransceiverNotFound(mid.to_string())
+                    CreateError::TransceiverNotFound(mid.to_string())
                 })
                 .map_err(tracerr::wrap!())?,
         };
@@ -161,7 +188,7 @@ impl Sender {
     pub(super) async fn insert_track(
         self: Rc<Self>,
         new_track: Rc<local::Track>,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<InsertTrackError>> {
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
             if new_track.id() == current_track.id() {
@@ -176,7 +203,7 @@ impl Sender {
         self.transceiver
             .set_send_track(Rc::new(new_track))
             .await
-            .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
+            .map_err(InsertTrackError::from)
             .map_err(tracerr::wrap!())?;
 
         Ok(())

@@ -2,19 +2,11 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use derive_more::{Display, From, Mul};
+use derive_more::Mul;
 use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 
-use crate::{
-    platform,
-    utils::{JsCaused, TaskHandle},
-};
-
-/// Errors that may occur in [`Heartbeat`].
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
-pub struct HeartbeatError(platform::TransportError);
+use crate::{platform, utils::TaskHandle};
 
 /// Idle timeout of [`WebSocketRpcClient`].
 ///

@@ -1,6 +1,6 @@
 //! [`Component`] for `MediaTrack` with a `Recv` direction.
 
-use std::rc::Rc;
+use std::{convert::Infallible, rc::Rc};
 
 use futures::StreamExt as _;
 use medea_client_api_proto as proto;
@@ -17,9 +17,7 @@ use crate::{
     media::{LocalTracksConstraints, MediaKind},
     peer::{
         component::SyncState,
-        media::{
-            transitable_state::media_exchange_state, InTransition, Result,
-        },
+        media::{transitable_state::media_exchange_state, InTransition},
         MediaExchangeState, MediaExchangeStateController,
         MediaStateControllable, MuteStateController, TransceiverSide,
     },
@@ -272,7 +270,7 @@ impl Component {
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: Guarded<media_exchange_state::Stable>,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         let (state, _guard) = state.into_parts();
         receiver
             .enabled_general
@@ -310,7 +308,7 @@ impl Component {
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Stable,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         receiver
             .enabled_individual
             .set(state == media_exchange_state::Stable::Enabled);
@@ -330,7 +328,7 @@ impl Component {
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Transition,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         receiver.send_media_exchange_state_intention(state);
         Ok(())
     }
@@ -345,7 +343,7 @@ impl Component {
         receiver: Rc<Receiver>,
         _: Rc<State>,
         muted: bool,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         receiver.muted.set(muted);
         if let Some(track) = receiver.track.borrow().as_ref() {
             track.set_muted(muted)
@@ -362,7 +360,7 @@ impl Component {
         receiver: Rc<Receiver>,
         state: Rc<State>,
         sync_state: SyncState,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         match sync_state {
             SyncState::Synced => {
                 if let MediaExchangeState::Transition(transition) =

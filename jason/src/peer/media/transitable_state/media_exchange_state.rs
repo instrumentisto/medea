@@ -1,9 +1,11 @@
 //! State of the media publishing.
 
+use derive_more::Display;
+
 use super::{InStable, InTransition};
 
 /// State of the media publishing.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum Stable {
     /// [`MediaStateControllable`] is enabled.
     ///

@@ -19,7 +19,7 @@ use tracerr::Traced;
 
 use crate::{
     media::LocalTracksConstraints,
-    peer::PeerError,
+    peer::UpdateLocalStreamError,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
 
@@ -75,6 +75,8 @@ impl<S> TracksRepository<S> {
     }
 
     /// Returns a [`Stream`] streaming all the [`TracksRepository::remove`]s.
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(
         &self,
@@ -117,11 +119,12 @@ impl TracksRepository<sender::State> {
     ///
     /// [`Future`]: std::future::Future
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+    ) -> LocalBoxFuture<'static, Result<(), Traced<UpdateLocalStreamError>>>
+    {
         let senders = self.0.borrow();
         Box::pin(
             future::try_join_all(tracks_ids.into_iter().filter_map(|id| {

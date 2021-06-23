@@ -1,6 +1,9 @@
 //! Component responsible for the [`peer::Component`] creating and removing.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell, collections::HashMap, convert::Infallible, rc::Rc,
+    time::Duration,
+};
 
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{self as proto, PeerId};
@@ -11,8 +14,8 @@ use tracerr::Traced;
 use crate::{
     connection::Connections,
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
-    peer, platform,
-    room::RoomError,
+    peer::{self, RtcPeerConnectionError},
+    platform,
     utils::{
         component, AsProtoState, SynchronizableState, TaskHandle,
         Updatable as _,
@@ -231,7 +234,7 @@ impl Component {
         peers: Rc<Repository>,
         _: Rc<State>,
         (peer_id, new_peer): (PeerId, Rc<peer::State>),
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Result<(), Traced<RtcPeerConnectionError>> {
         let peer = peer::Component::new(
             PeerConnection::new(
                 &new_peer,
@@ -262,7 +265,7 @@ impl Component {
         peers: Rc<Repository>,
         _: Rc<State>,
         (peer_id, _): (PeerId, Rc<peer::State>),
-    ) -> Result<(), Traced<RoomError>> {
+    ) -> Result<(), Infallible> {
         peers.peers.borrow_mut().remove(&peer_id);
         peers.connections.close_connection(peer_id);
         Ok(())

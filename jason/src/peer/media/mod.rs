@@ -6,14 +6,16 @@ pub mod receiver;
 pub mod sender;
 mod transitable_state;
 
-use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use derive_more::Display;
-use futures::{channel::mpsc, future, future::LocalBoxFuture};
+use derive_more::{Display, From};
+use futures::{
+    channel::mpsc, future, future::LocalBoxFuture, FutureExt as _,
+    TryFutureExt as _,
+};
 use medea_client_api_proto as proto;
 #[cfg(feature = "mockable")]
 use medea_client_api_proto::{MediaType, MemberId};
-use medea_reactive::DroppedError;
 use proto::{MediaSourceKind, TrackId};
 use tracerr::Traced;
 
@@ -41,9 +43,6 @@ pub use self::{
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
-///
-/// [`Sender`]: self::sender::Sender
-/// [`Receiver`]: self::receiver::Receiver
 pub trait TransceiverSide: MediaStateControllable {
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
@@ -92,13 +91,13 @@ pub trait MediaStateControllable {
     ///
     /// # Errors
     ///
-    /// Implementors might return [`MediaConnectionsError`] if transition could
-    /// not be made for some reason.
+    /// Implementors might return [`ProhibitedStateError`] if a transition
+    /// cannot be made for some reason.
     #[inline]
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<ProhibitedStateError>> {
         match desired_state {
             MediaState::MediaExchange(desired_state) => {
                 self.media_exchange_state_controller()
@@ -176,29 +175,33 @@ pub trait MediaStateControllable {
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`]
-    /// is returned if [`MediaState`] transits into the opposite to the
-    /// `desired_state`.
+    /// With an approved stable [`MediaState`] if transition to the
+    /// `desired_state` cannot be made.
     ///
     /// [`Future`]: std::future::Future
+    /// [`MediaState`]: super::MediaState
     #[inline]
     fn when_media_state_stable(
         &self,
         desired_state: MediaState,
-    ) -> LocalBoxFuture<'static, Result<()>> {
+    ) -> LocalBoxFuture<'static, Result<(), MediaState>> {
         match desired_state {
             MediaState::Mute(desired_state) => self
                 .mute_state_controller()
-                .when_media_state_stable(desired_state),
+                .when_media_state_stable(desired_state)
+                .map_err(MediaState::Mute)
+                .boxed_local(),
             MediaState::MediaExchange(desired_state) => self
                 .media_exchange_state_controller()
-                .when_media_state_stable(desired_state),
+                .when_media_state_stable(desired_state)
+                .map_err(MediaState::MediaExchange)
+                .boxed_local(),
         }
     }
 }
 
 /// Direction of the `MediaTrack`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TrackDirection {
     /// Sends media data.
     Send,
@@ -207,100 +210,48 @@ pub enum TrackDirection {
     Recv,
 }
 
-/// Errors that may occur in [`MediaConnections`] storage.
-#[derive(Clone, Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
-pub enum MediaConnectionsError {
-    /// Occurs when the provided [`local::Track`] cannot be inserted into
-    /// provided [`Sender`]s transceiver.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
-    CouldNotInsertLocalTrack(platform::Error),
-
-    /// Occurs when [`remote::Track`] discovered by a
-    /// [`platform::RtcPeerConnection`] couldn't be inserted into a
-    /// [`Receiver`].
-    ///
-    /// [`remote::Track`]: crate::media::track::remote::Track
-    /// [`Receiver`]: self::receiver::Receiver
-    #[display(
-        fmt = "Could not insert remote track with mid: {:?} into media \
-               connections",
-        _0
-    )]
-    CouldNotInsertRemoteTrack(String),
-
-    /// Could not find a [`platform::Transceiver`] by `mid`.
-    #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
-    TransceiverNotFound(String),
-
-    /// Occurs when cannot get the `mid` from the [`Sender`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "Peer has senders without mid")]
-    SendersWithoutMid,
-
-    /// Occurs when cannot get the `mid` from the [`Receiver`].
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
-    #[display(fmt = "Peer has receivers without mid")]
-    ReceiversWithoutMid,
-
-    /// Occurs when not enough [`local::Track`]s are inserted into senders.
-    #[display(fmt = "Provided stream does not have all necessary Tracks")]
-    InvalidMediaTracks,
-
-    /// Occurs when [`local::Track`] does not satisfy [`Sender`] constraints.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "Provided Track does not satisfy senders constraints")]
-    InvalidMediaTrack,
-
-    /// Occurs when [`MediaExchangeState`] of [`Sender`] was dropped.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "MediaExchangeState of Sender was dropped.")]
-    MediaExchangeStateDropped,
-
-    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
-    /// to expected [`MediaState`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "MediaState of Sender transits into opposite to \
-                     expected MediaExchangeState")]
-    MediaStateTransitsIntoOppositeState,
-
-    /// Invalid [`medea_client_api_proto::TrackPatchEvent`] for
-    /// [`local::Track`].
-    #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
-    InvalidTrackPatch(TrackId),
-
-    /// Some [`Sender`] can't be disabled because it required.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
+/// Error occurring when media state transition is not allowed.
+#[derive(Clone, Debug, Display, From)]
+pub enum ProhibitedStateError {
+    /// [`Sender`] cannot be disabled because it's required.
+    #[display(fmt = "MediaExchangeState of Sender can't transit to \
                      disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
 }
 
-impl From<DroppedError> for MediaConnectionsError {
-    #[inline]
-    fn from(_: DroppedError) -> Self {
-        Self::MediaExchangeStateDropped
-    }
+/// Errors occurring in [`MediaConnections::insert_local_tracks()`] method.
+#[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum InsertLocalTracksError {
+    /// [`local::Track`] doesn't satisfy [`Sender`]'s constraints.
+    #[display(fmt = "Provided Track doesn't satisfy senders constraints")]
+    InvalidMediaTrack,
+
+    /// There are not enough [`local::Track`]s being inserted into [`Sender`]s.
+    #[display(fmt = "Provided stream does not have all necessary Tracks")]
+    NotEnoughTracks,
+
+    /// Insertion of a [`local::Track`] into a [`Sender`] fails.
+    CouldNotInsertLocalTrack(sender::InsertTrackError),
 }
 
-type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
+/// Errors occurring in [`MediaConnections::get_mids()`] method.
+#[derive(Clone, Debug, Display)]
+pub enum GetMidsError {
+    /// Cannot get the `mid` from a [`Sender`].
+    #[display(fmt = "Peer has senders without mid")]
+    SendersWithoutMid,
+
+    /// Cannot get the `mid` from a [`Receiver`].
+    #[display(fmt = "Peer has receivers without mid")]
+    ReceiversWithoutMid,
+}
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
     /// Reference to the parent [`platform::RtcPeerConnection`].
     ///
     /// Used to generate transceivers for [`Sender`]s and [`Receiver`]s.
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     peer: Rc<platform::RtcPeerConnection>,
 
     /// [`PeerEvent`]s tx.
@@ -408,9 +359,6 @@ impl MediaConnections {
     /// Returns all [`Sender`]s and [`Receiver`]s from this [`MediaConnections`]
     /// with provided [`MediaKind`], [`TrackDirection`] and
     /// [`MediaSourceKind`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     pub fn get_transceivers_sides(
         &self,
         kind: MediaKind,
@@ -467,17 +415,10 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaConnectionsError::SendersWithoutMid`] if some
-    /// [`Sender`] doesn't have [mid].
-    ///
-    /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
-    /// [`Receiver`] doesn't have [mid].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
-    /// [mid]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+    /// See [`GetMidsError`] for details.
+    pub fn get_mids(
+        &self,
+    ) -> Result<HashMap<TrackId, String>, Traced<GetMidsError>> {
         let inner = self.0.borrow();
         let mut mids =
             HashMap::with_capacity(inner.senders.len() + inner.receivers.len());
@@ -486,7 +427,7 @@ impl MediaConnections {
                 *track_id,
                 sender
                     .mid()
-                    .ok_or(MediaConnectionsError::SendersWithoutMid)
+                    .ok_or(GetMidsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
         }
@@ -495,7 +436,7 @@ impl MediaConnections {
                 *track_id,
                 receiver
                     .mid()
-                    .ok_or(MediaConnectionsError::ReceiversWithoutMid)
+                    .ok_or(GetMidsError::ReceiversWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
         }
@@ -504,9 +445,6 @@ impl MediaConnections {
 
     /// Returns activity statuses of the all the [`Sender`]s and [`Receiver`]s
     /// from these [`MediaConnections`].
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         let inner = self.0.borrow();
 
@@ -562,8 +500,6 @@ impl MediaConnections {
     /// Returns [`TracksRequest`] based on [`Sender`]s in this
     /// [`MediaConnections`]. [`Sender`]s are chosen based on provided
     /// [`LocalStreamUpdateCriteria`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub fn get_tracks_request(
         &self,
         kinds: LocalStreamUpdateCriteria,
@@ -595,23 +531,16 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// With [`MediaConnectionsError::InvalidMediaTracks`] if provided
-    /// [`HashMap`] doesn't contain required [`local::Track`].
+    /// See [`InsertLocalTracksError`] for details.
     ///
-    /// With [`MediaConnectionsError::InvalidMediaTrack`] if some
-    /// [`local::Track`] cannot be inserted into associated [`Sender`] because
-    /// of constraints mismatch.
-    ///
-    /// With [`MediaConnectionsError::CouldNotInsertLocalTrack`] if some
-    /// [`local::Track`] cannot be inserted into provided [`Sender`]s
-    /// transceiver.
-    ///
-    /// [`Sender`]: self::sender::Sender
     /// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, Rc<local::Track>>,
-    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
+    ) -> Result<
+        HashMap<TrackId, media_exchange_state::Stable>,
+        Traced<InsertLocalTracksError>,
+    > {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track =
             Vec::with_capacity(self.0.borrow().senders.len());
@@ -626,12 +555,12 @@ impl MediaConnections {
                     sender_and_track.push((sender.obj(), track));
                 } else {
                     return Err(tracerr::new!(
-                        MediaConnectionsError::InvalidMediaTrack
+                        InsertLocalTracksError::InvalidMediaTrack
                     ));
                 }
             } else if sender.caps().required() {
                 return Err(tracerr::new!(
-                    MediaConnectionsError::InvalidMediaTracks
+                    InsertLocalTracksError::NotEnoughTracks
                 ));
             } else {
                 media_exchange_state_updates.insert(
@@ -643,11 +572,11 @@ impl MediaConnections {
 
         future::try_join_all(sender_and_track.into_iter().map(
             |(sender, track)| async move {
-                Rc::clone(&sender).insert_track(track).await?;
-                Ok::<(), Traced<MediaConnectionsError>>(())
+                Rc::clone(&sender).insert_track(track).await
             },
         ))
-        .await?;
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(media_exchange_state_updates)
     }
@@ -656,8 +585,8 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
-    /// could not find [`Receiver`] by transceivers `mid`.
+    /// Errors with a transceivers `mid` if could not find [`Receiver`] by this
+    /// `mid`.
     ///
     /// # Panics
     ///
@@ -665,14 +594,12 @@ impl MediaConnections {
     /// supposed to happen, since [`platform::MediaStreamTrack`] is only fired
     /// when a [`platform::Transceiver`] is negotiated, thus have a [`mid`].
     ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn add_remote_track(
         &self,
         track: platform::MediaStreamTrack,
         transceiver: platform::Transceiver,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         let inner = self.0.borrow();
         // Cannot fail, since transceiver is guaranteed to be negotiated at this
         // point.
@@ -686,9 +613,7 @@ impl MediaConnections {
                 }
             }
         }
-        Err(tracerr::new!(
-            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
-        ))
+        Err(mid)
     }
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without
@@ -696,7 +621,6 @@ impl MediaConnections {
     /// [`platform::Transceiver`] in the [`platform::RtcPeerConnection`] and to
     /// insert it into the [`Receiver`].
     ///
-    /// [`Receiver`]: self::receiver::Receiver
     /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
@@ -715,8 +639,6 @@ impl MediaConnections {
 
     /// Returns all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub fn get_senders_without_tracks_ids(
         &self,
         kinds: LocalStreamUpdateCriteria,
@@ -740,8 +662,6 @@ impl MediaConnections {
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
         let remove_tracks_fut = future::join_all(
             self.0.borrow().senders.values().filter_map(|s| {
@@ -772,8 +692,6 @@ impl MediaConnections {
 impl MediaConnections {
     /// Indicates whether all [`Receiver`]s with [`MediaKind::Video`] are
     /// enabled.
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[must_use]
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
@@ -785,8 +703,6 @@ impl MediaConnections {
 
     /// Indicates whether if all [`Receiver`]s with [`MediaKind::Audio`] are
     /// enabled.
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[must_use]
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
@@ -797,8 +713,6 @@ impl MediaConnections {
     }
 
     /// Returns [`Receiver`] with the provided [`TrackId`].
-    ///
-    /// [`Receiver`]: self::receiver::Receiver
     #[must_use]
     pub fn get_receiver_by_id(
         &self,
@@ -808,16 +722,12 @@ impl MediaConnections {
     }
 
     /// Returns [`Sender`] with a provided [`TrackId`].
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<sender::Sender>> {
         self.0.borrow().senders.get(&id).map(|r| r.obj())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
@@ -827,8 +737,6 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_video_enabled(
         &self,
@@ -844,8 +752,6 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]'s video tracks are unmuted.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_video_unmuted(
         &self,
@@ -862,8 +768,6 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]'s audio tracks are unmuted.
-    ///
-    /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn is_send_audio_unmuted(&self) -> bool {
         self.0
@@ -881,7 +785,7 @@ impl MediaConnections {
         mid: Option<String>,
         receivers: Vec<MemberId>,
         send_constraints: &LocalTracksConstraints,
-    ) -> Result<sender::Component> {
+    ) -> Result<sender::Component, Traced<sender::CreateError>> {
         let sender_state = sender::State::new(
             id,
             mid.clone(),
@@ -932,7 +836,7 @@ impl MediaConnections {
         tracks: Vec<proto::Track>,
         send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<sender::CreateError>> {
         use medea_client_api_proto::Direction;
         for track in tracks {
             match track.direction {
@@ -962,8 +866,6 @@ impl MediaConnections {
     }
 
     /// Returns all underlying [`Sender`]'s.
-    ///
-    /// [`Sender`]: self::sender::Sender
     pub fn get_senders(&self) -> Vec<Rc<sender::Sender>> {
         self.0
             .borrow()

@@ -1,6 +1,6 @@
 //! [`Component`] for `MediaTrack` with a `Send` direction.
 
-use std::rc::Rc;
+use std::{convert::Infallible, rc::Rc};
 
 use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto::{
@@ -14,15 +14,13 @@ use tracerr::Traced;
 use crate::{
     media::{LocalTracksConstraints, MediaKind, TrackConstraints, VideoSource},
     peer::{
-        self,
         component::SyncState,
         media::{
             media_exchange_state, mute_state, InTransition, MediaExchangeState,
-            MuteState, Result,
+            MuteState, ProhibitedStateError,
         },
-        MediaConnectionsError, MediaExchangeStateController, MediaState,
-        MediaStateControllable, MuteStateController, PeerError,
-        TransceiverSide,
+        MediaExchangeStateController, MediaState, MediaStateControllable,
+        MuteStateController, TransceiverSide, UpdateLocalStreamError,
     },
     platform,
     utils::{component, AsProtoState, SynchronizableState, Updatable},
@@ -50,13 +48,13 @@ enum LocalTrackState {
 
     /// Indicates that new [`local::Track`] getting is failed.
     ///
-    /// Contains [`PeerError`] with which
-    /// [getUserMedia()][1]/[getDisplayMedia()][2] request was failed.
+    /// Contains an [`UpdateLocalStreamError`] with which
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request failed.
     ///
     /// [`local::Track`]: crate::media::track::local::Track
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    Failed(Traced<PeerError>),
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+    Failed(Traced<UpdateLocalStreamError>),
 }
 
 impl PartialEq for LocalTrackState {
@@ -223,11 +221,6 @@ impl From<&State> for proto::state::Sender {
 
 impl State {
     /// Creates new [`State`] with the provided data.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
-    /// [`Sender`] cannot be disabled.
     #[must_use]
     pub fn new(
         id: TrackId,
@@ -323,7 +316,8 @@ impl State {
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
-    ) -> LocalBoxFuture<'static, peer::Result<()>> {
+    ) -> LocalBoxFuture<'static, Result<(), Traced<UpdateLocalStreamError>>>
+    {
         let mut local_track_state_rx = self.local_track_state.subscribe();
         Box::pin(async move {
             while let Some(s) = local_track_state_rx.next().await {
@@ -368,7 +362,10 @@ impl State {
     /// Marks an inner `local_track_state` of this [`State`] as failed with the
     /// provided `error`.
     #[inline]
-    pub fn failed_local_stream_update(&self, error: Traced<PeerError>) {
+    pub fn failed_local_stream_update(
+        &self,
+        error: Traced<UpdateLocalStreamError>,
+    ) {
         self.local_track_state.set(LocalTrackState::Failed(error));
     }
 
@@ -413,7 +410,7 @@ impl Component {
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: media_exchange_state::Transition,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         sender.send_media_exchange_state_intention(new_state);
         Ok(())
     }
@@ -429,7 +426,7 @@ impl Component {
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: mute_state::Transition,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         sender.send_mute_state_intention(new_state);
         Ok(())
     }
@@ -446,7 +443,7 @@ impl Component {
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: Guarded<media_exchange_state::Stable>,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         let (new_state, _guard) = new_state.into_parts();
         sender
             .enabled_general
@@ -484,7 +481,7 @@ impl Component {
         sender: Rc<Sender>,
         state: Rc<State>,
         new_state: media_exchange_state::Stable,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         sender
             .enabled_individual
             .set(new_state == media_exchange_state::Stable::Enabled);
@@ -510,7 +507,7 @@ impl Component {
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: mute_state::Stable,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         sender.muted.set(new_state == mute_state::Stable::Muted);
         match new_state {
             mute_state::Stable::Muted => {
@@ -532,7 +529,7 @@ impl Component {
         sender: Rc<Sender>,
         state: Rc<State>,
         sync_state: SyncState,
-    ) -> Result<()> {
+    ) -> Result<(), Infallible> {
         match sync_state {
             SyncState::Synced => {
                 if let MediaExchangeState::Transition(transition) =
@@ -604,7 +601,7 @@ impl MediaStateControllable for State {
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,
-    ) -> Result<()> {
+    ) -> Result<(), Traced<ProhibitedStateError>> {
         if self.media_type.required()
             && matches!(
                 desired_state,
@@ -615,7 +612,7 @@ impl MediaStateControllable for State {
             )
         {
             Err(tracerr::new!(
-                MediaConnectionsError::CannotDisableRequiredSender
+                ProhibitedStateError::CannotDisableRequiredSender
             ))
         } else {
             match desired_state {
