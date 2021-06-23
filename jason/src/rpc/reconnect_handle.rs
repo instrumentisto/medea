@@ -19,18 +19,26 @@ use crate::{
 #[js(error = "platform::Error")]
 pub enum ReconnectError {
     /// Connection with a server was lost.
+    ///
+    /// This usually means that some transport error occurred, so a client can
+    /// continue performing reconnecting attempts.
     #[display(fmt = "Connection with a server was lost: {}", _0)]
     ConnectionLost(ConnectionLostReason),
 
-    /// Could not authorize RPC session.
+    /// Could not authorize an RPC session.
+    ///
+    /// This usually means that authentication data a client provides is
+    /// obsolete.
     #[display(fmt = "Failed to authorize RPC session")]
     AuthorizationFailed,
 
-    /// RPC Session is finished. This is a terminal state.
-    #[display(fmt = "RPC Session finished with {:?} close reason", _0)]
+    /// RPC session has benn finished. This is a terminal state.
+    #[display(fmt = "RPC session finished with {:?} close reason", _0)]
     SessionFinished(CloseReason),
 
     /// Internal error that is not meant to be handled by external users.
+    ///
+    /// This is a programmatic error.
     Internal(Cow<'static, str>),
 
     /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
@@ -39,18 +47,17 @@ pub enum ReconnectError {
 }
 
 impl From<SessionError> for ReconnectError {
+    #[inline]
     fn from(err: SessionError) -> Self {
-        use ReconnectError as RE;
         use SessionError as SE;
-
         match err {
-            SE::SessionFinished(cr) => RE::SessionFinished(cr),
+            SE::SessionFinished(cr) => Self::SessionFinished(cr),
             SE::NoCredentials
             | SE::SessionUnexpectedlyDropped
-            | SE::NewConnectionInfo => RE::Internal(err.to_string().into()),
-            SE::AuthorizationFailed => RE::AuthorizationFailed,
-            SE::RpcClient(client) => RE::Internal(client.to_string().into()),
-            SE::ConnectionLost(clr) => RE::ConnectionLost(clr),
+            | SE::NewConnectionInfo => Self::Internal(err.to_string().into()),
+            SE::AuthorizationFailed => Self::AuthorizationFailed,
+            SE::RpcClient(client) => Self::Internal(client.to_string().into()),
+            SE::ConnectionLost(clr) => Self::ConnectionLost(clr),
         }
     }
 }
@@ -78,21 +85,7 @@ impl ReconnectHandle {
     ///
     /// # Errors
     ///
-    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`ReconnectError::AuthorizationFailed`] if the new connection was
-    /// declined by server. This usually means that authentication data the
-    /// client provides is obsolete.
-    ///
-    /// With [`ReconnectError::ConnectionLost`] if the new connection could not
-    /// be established. This usually means that some transport error occurred,
-    /// so users can continue performing reconnect attempts.
-    ///
-    /// With [`ReconnectError::SessionFinished`] if connection was closed by
-    /// server, this is a terminal state.
-    ///
-    /// With [`ReconnectError::Internal`] if any internal error occurs. This is
-    /// a programmatic error.
+    /// See [`ReconnectError`] for details.
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
@@ -131,21 +124,7 @@ impl ReconnectHandle {
     ///
     /// # Errors
     ///
-    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`ReconnectError::AuthorizationFailed`] if the new connection was
-    /// declined by server. This usually means that authentication data the
-    /// client provides is obsolete.
-    ///
-    /// With [`ReconnectError::ConnectionLost`] if the new connection could not
-    /// be established. This usually means that some transport error occurred,
-    /// so users can continue performing reconnect attempts.
-    ///
-    /// With [`ReconnectError::SessionFinished`] if connection was closed by
-    /// server, this is a terminal state.
-    ///
-    /// With [`ReconnectError::Internal`] if any internal error occurs. This is
-    /// a programmatic error.
+    /// See [`ReconnectError`] for details.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,

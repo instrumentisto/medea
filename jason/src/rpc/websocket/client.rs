@@ -314,7 +314,7 @@ impl WebSocketRpcClient {
                 } else {
                     log::error!(
                         "Failed to update socket settings because Heartbeat is \
-                        None"
+                         None",
                     )
                 }
                 None

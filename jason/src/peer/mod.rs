@@ -44,7 +44,7 @@ pub use self::{
         media_exchange_state, mute_state, receiver, sender, GetMidsError,
         InsertLocalTracksError, MediaConnections, MediaExchangeState,
         MediaExchangeStateController, MediaState, MediaStateControllable,
-        MuteState, MuteStateController, ProhibitedState, TrackDirection,
+        MuteState, MuteStateController, ProhibitedStateError, TrackDirection,
         TransceiverSide, TransitableState, TransitableStateController,
     },
     platform::RtcPeerConnectionError,
@@ -52,18 +52,17 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
 };
 
-/// Errors returned from the [`PeerConnection::update_local_stream()`] method.
+/// Errors occurring in [`PeerConnection::update_local_stream()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum UpdateLocalStreamError {
-    /// Errors that occur [`TracksRequest`] validation fails.
+    /// Errors occurred when [`TracksRequest`] validation fails.
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
     CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 
-    /// Errors returned from the [`MediaConnections::insert_local_tracks()`]
-    /// method.
+    /// Errors occurred in [`MediaConnections::insert_local_tracks()`] method.
     InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
 }
 
@@ -370,10 +369,10 @@ impl PeerConnection {
         // Bind to `track` event.
         let media_connections = Rc::clone(&peer.media_connections);
         peer.peer.on_track(Some(move |track, transceiver| {
-            if let Err(e) =
+            if let Err(mid) =
                 media_connections.add_remote_track(track, transceiver)
             {
-                log::error!("Could not add new remote track with mid = {}", e);
+                log::error!("Cannot add new remote track with mid={}", mid);
             };
         }));
 
@@ -619,12 +618,7 @@ impl PeerConnection {
     fn get_mids(
         &self,
     ) -> Result<HashMap<TrackId, String>, Traced<GetMidsError>> {
-        let mids = self
-            .media_connections
-            .get_mids()
-            .map_err(tracerr::wrap!())?;
-
-        Ok(mids)
+        self.media_connections.get_mids().map_err(tracerr::wrap!())
     }
 
     /// Returns publishing statuses of the all [`Sender`]s from this
@@ -665,13 +659,13 @@ impl PeerConnection {
     /// state of the [`PeerConnection`]'s [`Sender`]s cannot be represented as
     /// [`SimpleTracksRequest`] (max 1 audio [`Sender`] and max 2 video
     /// [`Sender`]s), or the [`local::Track`]s requested from the
-    /// [`MediaManager`] does not satisfy [`Sender`]'s constraints.
+    /// [`MediaManager`] doesn't satisfy [`Sender`]'s constraints.
     ///
     /// With an [`UpdateLocalStreamError::CouldNotGetLocalMedia`] if the
-    /// [`local::Track`]s could not be obtained from the UA.
+    /// [`local::Track`]s cannot be obtained from the UA.
     ///
     /// With an [`UpdateLocalStreamError::InvalidLocalTracks`] if the
-    /// [`local::Track`]s couldn't inserted into [`PeerConnection`]s
+    /// [`local::Track`]s cannot be inserted into [`PeerConnection`]s
     /// [`Sender`]s.
     ///
     /// [`Sender`]: sender::Sender

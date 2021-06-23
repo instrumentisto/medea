@@ -196,7 +196,7 @@ where
     /// # Errors
     ///
     /// With an approved stable [`MediaState`] if transition to the
-    /// `desired_state` could not be made.
+    /// `desired_state` cannot be made.
     ///
     /// [`Future`]: std::future::Future
     /// [`MediaState`]: super::MediaState

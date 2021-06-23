@@ -119,7 +119,7 @@ impl TracksRepository<sender::State> {
     ///
     /// [`Future`]: std::future::Future
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,

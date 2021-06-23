@@ -171,10 +171,10 @@ pub enum ClosedStateReason {
     /// Indicates that connection with server has never been established.
     NeverConnected,
 
-    /// Error while creating connection between client and server.
+    /// Failed to establish a connection between a client and a server.
     CouldNotEstablish(platform::TransportError),
 
-    /// Connection with server was lost.
+    /// Lost a connection with a server.
     ConnectionLost(ConnectionLostReason),
 
     /// First received [`ServerMsg`] after [`WebSocketRpcClient::connect`] is
@@ -185,12 +185,11 @@ pub enum ClosedStateReason {
     FirstServerMsgIsNotRpcSettings,
 }
 
-/// The reason of why [`WebSocketRpcClient`]/[`platform::RpcTransport`] lost
-/// connection to the server.
+/// Reason of why [`WebSocketRpcClient`]/[`platform::RpcTransport`] lost
+/// connection with a server.
 #[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum ConnectionLostReason {
-    /// Connection has been closed with a close frame with the provided
-    /// message.
+    /// Connection has been closed with a close frame and the provided message.
     WithMessage(CloseMsg),
 
     /// Connection has been inactive for a while and thus considered idle

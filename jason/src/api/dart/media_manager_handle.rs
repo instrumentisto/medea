@@ -25,9 +25,9 @@ pub use crate::media::MediaManagerHandle;
 impl ForeignClass for MediaManagerHandle {}
 
 impl From<Traced<EnumerateDevicesError>> for DartError {
+    #[inline]
     fn from(err: Traced<EnumerateDevicesError>) -> Self {
         let (err, stacktrace) = err.into_parts();
-
         EnumerateDevicesException::new(err.into(), stacktrace).into()
     }
 }
@@ -91,9 +91,8 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: ptr::NonNull<MediaManagerHandle>,
 ) -> DartFuture<
-        Result<PtrArray<InputDeviceInfo>, Traced<EnumerateDevicesError>>
-    >
-{
+    Result<PtrArray<InputDeviceInfo>, Traced<EnumerateDevicesError>>,
+> {
     let this = this.as_ref().clone();
 
     async move { Ok(PtrArray::new(this.enumerate_devices().await?)) }

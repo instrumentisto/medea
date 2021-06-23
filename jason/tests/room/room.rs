@@ -144,7 +144,7 @@ async fn error_get_local_stream_on_new_peer() {
         cb_assert_eq!(
             &err.message(),
             "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-            Unknown JS error: error_get_local_stream_on_new_peer"
+             Unknown JS error: error_get_local_stream_on_new_peer"
         );
     });
 

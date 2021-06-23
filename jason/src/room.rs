@@ -28,7 +28,7 @@ use crate::{
         MediaSourceKind, MediaStreamSettings, RecvConstraints,
     },
     peer::{
-        self, media::ProhibitedState, media_exchange_state, mute_state,
+        self, media::ProhibitedStateError, media_exchange_state, mute_state,
         InsertLocalTracksError, LocalStreamUpdateCriteria, MediaState,
         PeerConnection, PeerEvent, PeerEventHandler, TrackDirection,
         TracksRequestError, UpdateLocalStreamError,
@@ -103,7 +103,7 @@ impl RoomCloseReason {
     }
 }
 
-/// Errors that may be thrown from [`RoomHandle::join()`] method.
+/// Errors occurring in [`RoomHandle::join()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum RoomJoinError {
@@ -125,13 +125,12 @@ pub enum RoomJoinError {
     SessionError(#[js(cause)] SessionError),
 }
 
-/// [`RoomHandle`]'s [`Weak`] pointer is detached.
-#[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
+/// Error of [`RoomHandle`]'s [`Weak`] pointer being detached.
+#[derive(Clone, Debug, Display, Eq, From, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
 pub struct HandleDetachedError;
 
-/// Errors that can occur when changing media state of [`Sender`]s and
-/// [`Receiver`]s.
+/// Errors occurring when changing media state of [`Sender`]s and [`Receiver`]s.
 ///
 /// [`Sender`]: peer::media::Sender
 /// [`Receiver`]: peer::media::Receiver
@@ -142,7 +141,7 @@ pub enum ChangeMediaStateError {
     #[display(fmt = "Room is in detached state")]
     Detached,
 
-    /// Errors that may occur when validating [`TracksRequest`].
+    /// Validating [`TracksRequest`] doesn't pass.
     ///
     /// [`TracksRequest`]: peer::TracksRequest
     InvalidLocalTracks(TracksRequestError),
@@ -150,7 +149,7 @@ pub enum ChangeMediaStateError {
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
     CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 
-    /// Occurs when local tracks could not be inserted into [`Sender`]s of some
+    /// [`local::Track`]s cannot be inserted into [`Sender`]s of some
     /// [`PeerConnection`] in this [`Room`].
     ///
     /// [`Sender`]: peer::media::Sender
@@ -159,33 +158,34 @@ pub enum ChangeMediaStateError {
     /// Requested state transition is not allowed by [`Sender`]'s settings.
     ///
     /// [`Sender`]: peer::media::Sender
-    ProhibitedState(ProhibitedState),
+    ProhibitedState(ProhibitedStateError),
 
-    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
-    /// to the requested [`MediaState`].
+    /// [`MediaState`] of a [`Sender`] transits to an opposite of the requested
+    /// one.
     ///
     /// [`Sender`]: peer::media::Sender
     #[display(
-        fmt = "MediaState of Sender transits into opposite ({})  to the \
-                requested MediaExchangeState",
+        fmt = "MediaState of Sender transits to opposite ({}) of the \
+               requested MediaExchangeState",
         _0
     )]
     TransitionIntoOppositeState(MediaState),
 }
 
 impl From<GetLocalTracksError> for ChangeMediaStateError {
+    #[inline]
     fn from(err: GetLocalTracksError) -> Self {
         match err {
-            GetLocalTracksError::InvalidLocalTracks(err) => Self::from(err),
-            GetLocalTracksError::CouldNotGetLocalMedia(err) => Self::from(err),
+            GetLocalTracksError::InvalidLocalTracks(e) => Self::from(e),
+            GetLocalTracksError::CouldNotGetLocalMedia(e) => Self::from(e),
         }
     }
 }
 
 impl From<UpdateLocalStreamError> for ChangeMediaStateError {
+    #[inline]
     fn from(err: UpdateLocalStreamError) -> Self {
         use UpdateLocalStreamError as UpdateErr;
-
         match err {
             UpdateErr::InvalidLocalTracks(e) => Self::from(e),
             UpdateErr::CouldNotGetLocalMedia(e) => Self::from(e),
@@ -194,19 +194,17 @@ impl From<UpdateLocalStreamError> for ChangeMediaStateError {
     }
 }
 
-/// Errors that occur when [`Room`] is trying to acquire [`local::Track`]s via
+/// Errors occurring when a [`Room`] tries to acquire [`local::Track`]s via
 /// [`MediaManager`].
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum GetLocalTracksError {
-    /// Errors that may occur when validating [`TracksRequest`].
+    /// Validating [`TracksRequest`] doesn't pass.
     ///
     /// [`TracksRequest`]: peer::TracksRequest
-    #[display(fmt = "Room is in detached state")]
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
-    #[display(fmt = "Room is in detached state")]
     CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
 }
 
@@ -234,16 +232,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomJoinError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`RoomJoinError::ConnectionInfoParse`] if the provided URL parsing
-    /// fails.
-    ///
-    /// With [`RoomJoinError::CallbackNotSet`] if `on_failed_local_media` or
-    /// `on_connection_loss` callback is not set.
-    ///
-    /// With [`RoomJoinError::SessionError`] if unable to connect to a media
-    /// server.
+    /// See [`RoomJoinError`] for details.
     pub async fn join(&self, url: String) -> Result<(), Traced<RoomJoinError>> {
         let inner = self
             .0
@@ -278,7 +267,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandleDetachedError`] for details.
     ///
     /// [`Connection`]: crate::connection::Connection
     pub fn on_new_connection(
@@ -294,7 +283,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_close(
         &self,
         f: platform::Function<api::RoomCloseReason>,
@@ -312,7 +301,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_local_track(
         &self,
         f: platform::Function<api::LocalMediaTrack>,
@@ -325,7 +314,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_failed_local_media(
         &self,
         f: platform::Function<api::JasonError>,
@@ -339,7 +328,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`HandleDetachedError`] if [`Weak`] pointer upgrade fails.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_connection_loss(
         &self,
         f: platform::Function<api::ReconnectHandle>,
@@ -588,8 +577,8 @@ impl RoomHandle {
     /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
     /// upgrade fails.
     ///
-    /// With [`ChangeMediaStateError::ProhibitedState`] if audio track's
-    /// sender is configured as `required`.
+    /// With [`ChangeMediaStateError::ProhibitedState`] if audio track's sender
+    /// is configured as `required`.
     ///
     /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::enable_audio()`] was called while disabling or a media
@@ -644,8 +633,8 @@ impl RoomHandle {
     /// With [`ChangeMediaStateError::Detached`] if an inner [`Weak`] pointer
     /// upgrade fails.
     ///
-    /// With [`ChangeMediaStateError::ProhibitedState`] video track's
-    /// sender is configured as `required`.
+    /// With [`ChangeMediaStateError::ProhibitedState`] video track's sender is
+    /// configured as `required`.
     ///
     /// With [`ChangeMediaStateError::TransitionIntoOppositeState`] if
     /// [`RoomHandle::enable_video()`] was called while disabling or a media
@@ -858,16 +847,16 @@ impl Room {
                             if let Err(e) = event
                                 .dispatch_with(&*inner)
                                 .await
-                                .map_err(tracerr::wrap!(=> UnknownPeerId))
+                                .map_err(tracerr::wrap!(=> UnknownPeerIdError))
                             {
                                 log::error!("{}", e);
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(e) = event
-                                .dispatch_with(&*inner)
-                                .await
-                                .map_err(tracerr::wrap!(=> UnknownRemoteMember))
+                            if let Err(e) =
+                                event.dispatch_with(&*inner).await.map_err(
+                                    tracerr::wrap!(=> UnknownRemoteMemberError),
+                                )
                             {
                                 log::error!("{}", e);
                             };
@@ -987,8 +976,7 @@ struct InnerRoom {
     close_reason: RefCell<CloseReason>,
 }
 
-/// Errors that may be thrown from the
-/// [`RoomHandle::set_local_media_settings()`] method.
+/// Errors occurring in [`RoomHandle::set_local_media_settings()`] method.
 #[derive(Debug, Display)]
 pub enum ConstraintsUpdateError {
     /// New [`MediaStreamSettings`] set failed and state was recovered
@@ -1007,8 +995,7 @@ pub enum ConstraintsUpdateError {
         /// [`ChangeMediaStateError`] due to which recovery has happened.
         recover_reason: Traced<ChangeMediaStateError>,
 
-        /// Vector of [`ChangeMediaStateError`]s due to which recovery has
-        /// failed.
+        /// [`ChangeMediaStateError`]s due to which recovery has failed.
         recover_fail_reasons: Vec<Traced<ChangeMediaStateError>>,
     },
 
@@ -1018,7 +1005,7 @@ pub enum ConstraintsUpdateError {
 }
 
 impl ConstraintsUpdateError {
-    /// Returns name of this [`ConstraintsUpdateError`].
+    /// Returns a name of this [`ConstraintsUpdateError`].
     #[inline]
     #[must_use]
     pub fn name(&self) -> String {
@@ -1102,8 +1089,8 @@ impl ConstraintsUpdateError {
     /// [`ChangeMediaStateError`].
     #[inline]
     #[must_use]
-    fn errored(error: Traced<ChangeMediaStateError>) -> Self {
-        Self::Errored(error)
+    fn errored(err: Traced<ChangeMediaStateError>) -> Self {
+        Self::Errored(err)
     }
 }
 
@@ -1267,12 +1254,12 @@ impl InnerRoom {
 
                             Ok(trnscvr.when_media_state_stable(desired_state))
                         })
-                        .collect::<Result<_, Traced<ProhibitedState>>>()
+                        .collect::<Result<_, Traced<ProhibitedStateError>>>()
                         .map_err(tracerr::wrap!())?;
 
                     Ok(future::try_join_all(transitions_futs))
                 })
-                .collect::<Result<Vec<_>, Traced<ProhibitedState>>>()
+                .collect::<Result<Vec<_>, Traced<ProhibitedStateError>>>()
                 .map_err(tracerr::map_from_and_wrap!())?,
         )
         .await
@@ -1305,7 +1292,7 @@ impl InnerRoom {
     /// With [`GetLocalTracksError::CouldNotGetLocalMedia`] if failed to obtain
     /// [`local::Track`]s from the [`MediaManager`].
     ///
-    /// With[`GetLocalTracksError::InvalidLocalTracks`] if failed to get
+    /// With [`GetLocalTracksError::InvalidLocalTracks`] if failed to get
     /// [`MediaStreamSettings`].
     async fn get_local_tracks(
         &self,
@@ -1535,15 +1522,16 @@ impl InnerRoom {
     }
 }
 
-/// [`RpcEvent`] contains [`PeerId`] that [`Room`] is not aware of.
-#[derive(Clone, Debug, Display)]
+/// Error of a [`RpcEvent`] containing a [`PeerId`] that a [`Room`] is not aware
+/// of.
+#[derive(Clone, Copy, Debug, Display)]
 #[display(fmt = "Peer with id {} doesnt exist", _0)]
-struct UnknownPeerId(PeerId);
+struct UnknownPeerIdError(PeerId);
 
 /// RPC events handling.
 #[async_trait(?Send)]
 impl EventHandler for InnerRoom {
-    type Output = Result<(), Traced<UnknownPeerId>>;
+    type Output = Result<(), Traced<UnknownPeerIdError>>;
 
     /// Creates [`PeerConnection`] with a provided ID and all the
     /// [`Connection`]s basing on provided [`Track`]s.
@@ -1585,7 +1573,7 @@ impl EventHandler for InnerRoom {
             .peers
             .state()
             .get(peer_id)
-            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
+            .ok_or_else(|| tracerr::new!(UnknownPeerIdError(peer_id)))?;
         peer.set_remote_sdp(sdp_answer);
 
         Ok(())
@@ -1601,7 +1589,7 @@ impl EventHandler for InnerRoom {
             .peers
             .state()
             .get(peer_id)
-            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
+            .ok_or_else(|| tracerr::new!(UnknownPeerIdError(peer_id)))?;
         peer_state.apply_local_sdp(local_sdp);
 
         Ok(())
@@ -1617,7 +1605,7 @@ impl EventHandler for InnerRoom {
             .peers
             .state()
             .get(peer_id)
-            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
+            .ok_or_else(|| tracerr::new!(UnknownPeerIdError(peer_id)))?;
         peer.add_ice_candidate(candidate);
 
         Ok(())
@@ -1649,7 +1637,7 @@ impl EventHandler for InnerRoom {
             .peers
             .state()
             .get(peer_id)
-            .ok_or_else(|| tracerr::new!(UnknownPeerId(peer_id)))?;
+            .ok_or_else(|| tracerr::new!(UnknownPeerIdError(peer_id)))?;
 
         for update in updates {
             match update {
@@ -1711,15 +1699,16 @@ impl EventHandler for InnerRoom {
     }
 }
 
-/// [`PeerEvent::NewRemoteTrack`] contains unknown remote [`MemberId`].
+/// Error of a [`PeerEvent::NewRemoteTrack`] containing an unknown remote
+/// [`MemberId`].
 #[derive(Clone, Debug, Display)]
 #[display(fmt = "Remote stream from unknown member")]
-struct UnknownRemoteMember(MemberId);
+struct UnknownRemoteMemberError(MemberId);
 
 /// [`PeerEvent`]s handling.
 #[async_trait(?Send)]
 impl PeerEventHandler for InnerRoom {
-    type Output = Result<(), Traced<UnknownRemoteMember>>;
+    type Output = Result<(), Traced<UnknownRemoteMemberError>>;
 
     /// Handles [`PeerEvent::IceCandidateDiscovered`] event and sends received
     /// candidate to RPC server.
@@ -1751,10 +1740,9 @@ impl PeerEventHandler for InnerRoom {
         sender_id: MemberId,
         track: remote::Track,
     ) -> Self::Output {
-        let conn = self
-            .connections
-            .get(&sender_id)
-            .ok_or_else(|| tracerr::new!(UnknownRemoteMember(sender_id)))?;
+        let conn = self.connections.get(&sender_id).ok_or_else(|| {
+            tracerr::new!(UnknownRemoteMemberError(sender_id))
+        })?;
         conn.add_remote_track(track);
 
         Ok(())

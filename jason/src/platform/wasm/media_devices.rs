@@ -21,7 +21,7 @@ use super::window;
 /// # Errors
 ///
 /// With [`Error`] if [MediaDevices.enumerateDevices()][1] returns error or
-/// couldn't get [MediaDevices][2].
+/// cannot get [MediaDevices][2].
 ///
 /// # Panics
 ///
@@ -64,7 +64,7 @@ pub async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>, Traced<Error>>
 ///
 /// # Errors
 ///
-/// With [`Error`] if [MediaDevices.getUserMedia()][1] returns error or couldn't
+/// With [`Error`] if [MediaDevices.getUserMedia()][1] returns error or cannot
 /// get [MediaDevices][2].
 ///
 /// # Panics
@@ -110,14 +110,14 @@ pub async fn get_user_media(
 /// # Errors
 ///
 /// With [`Error`] if [MediaDevices.getDisplayMedia()][1] returns error or
-/// couldn't get [MediaDevices][2]..
+/// cannot get [MediaDevices][2].
 ///
 /// # Panics
 ///
 /// If [`js_sys::Array`] returned from [MediaDevices.getDisplayMedia()][1]
 /// contains something that is not [`web_sys::MediaStreamTrack`].
 ///
-/// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+/// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
 pub async fn get_display_media(
     caps: DisplayMediaStreamConstraints,

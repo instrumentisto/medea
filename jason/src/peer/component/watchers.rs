@@ -20,24 +20,24 @@ use crate::{
 
 use super::{Component, PeerConnection, State};
 
-/// Errors that may occur in watchers of a [`Component`].
+/// Errors occurring in watchers of a [`Component`].
 #[derive(Clone, Debug, Display, From)]
 enum PeerWatcherError {
-    /// Errors from the platform's [RTCPeerConnection][1].
+    /// Errors occurred in platform's [RTCPeerConnection][1].
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     RtcPeerConnection(RtcPeerConnectionError),
 
-    /// Error acquiring list of `mid`s from the [`PeerConnection`].
+    /// Failed to acquire a list of `mid`s from a [`PeerConnection`].
     GetMids(GetMidsError),
 
-    /// Error creating [`Sender`].
+    /// Failed to create a [`Sender`].
     ///
     /// [`Sender`]: sender::Sender
     SenderCreateFailed(sender::CreateError),
 }
 
-// TODO: Dont force spawned watchers to return Result.
+// TODO: Don't force spawned watchers to return `Result`.
 #[watchers]
 impl Component {
     /// Watcher for the [`State::ice_candidates`] push update.

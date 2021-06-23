@@ -85,7 +85,7 @@ async fn failed_get_user_media() {
             assert_eq!(
                 err.message(),
                 "Failed to get local tracks: MediaDevices.getUserMedia() \
-                failed: Unknown JS error: failed_get_user_media",
+                 failed: Unknown JS error: failed_get_user_media",
             );
         }
     }
@@ -120,8 +120,8 @@ async fn failed_get_user_media2() {
             assert_eq!(
                 err.message(),
                 "Failed to get local tracks: MediaDevices.getUserMedia() \
-                failed: get_user_media_error_name: \
-                get_user_media_error_message",
+                 failed: get_user_media_error_name: \
+                 get_user_media_error_message",
             );
         }
     }

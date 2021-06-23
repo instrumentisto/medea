@@ -25,24 +25,24 @@ use super::{
 #[doc(inline)]
 pub use self::component::{Component, State};
 
-/// Errors returned from the [`Sender::new()`] method.
+/// Errors occurring when creating a new [`Sender`].
 #[derive(Clone, Debug, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum CreateError {
-    /// Some [`Sender`] can't be disabled because it is marked as `required`.
-    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
+    /// [`Sender`] cannot be disabled because it's marked as `required`.
+    #[display(fmt = "MediaExchangeState of Sender cannot transit to \
                      disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
 
     /// Could not find a [`platform::Transceiver`] by `mid`.
-    #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
+    #[display(fmt = "Unable to find Transceiver with mid: {}", _0)]
     TransceiverNotFound(String),
 }
 
-/// Error from the [`RTCRtpSender.replaceTrack()`][1] method call.
+/// Error occuring in [`RTCRtpSender.replaceTrack()`][1] method.
 ///
-/// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-#[derive(Debug, Display, Clone, JsCaused, From)]
+/// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
+#[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 #[display(fmt = "MediaManagerHandle is in detached state")]
 pub struct InsertTrackError(platform::Error);
@@ -70,8 +70,8 @@ impl Sender {
     /// [`mid`], but this [`mid`] isn't found in the [`MediaConnections`].
     ///
     /// With a [`CreateError::CannotDisableRequiredSender`] if the provided
-    /// [`LocalTracksConstraints`] are configured to disable this [`Sender`] but
-    /// it cannot be disabled according to the provide [`State`].
+    /// [`LocalTracksConstraints`] are configured to disable this [`Sender`],
+    /// but it cannot be disabled according to the provide [`State`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn new(

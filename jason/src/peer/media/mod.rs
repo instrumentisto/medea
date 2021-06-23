@@ -91,13 +91,13 @@ pub trait MediaStateControllable {
     ///
     /// # Errors
     ///
-    /// Implementors might return [`ProhibitedState`] if transition could not be
-    /// made for some reason.
+    /// Implementors might return [`ProhibitedStateError`] if a transition
+    /// cannot be made for some reason.
     #[inline]
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,
-    ) -> Result<(), Traced<ProhibitedState>> {
+    ) -> Result<(), Traced<ProhibitedStateError>> {
         match desired_state {
             MediaState::MediaExchange(desired_state) => {
                 self.media_exchange_state_controller()
@@ -176,7 +176,7 @@ pub trait MediaStateControllable {
     /// # Errors
     ///
     /// With an approved stable [`MediaState`] if transition to the
-    /// `desired_state` could not be made.
+    /// `desired_state` cannot be made.
     ///
     /// [`Future`]: std::future::Future
     /// [`MediaState`]: super::MediaState
@@ -201,7 +201,7 @@ pub trait MediaStateControllable {
 }
 
 /// Direction of the `MediaTrack`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TrackDirection {
     /// Sends media data.
     Send,
@@ -210,41 +210,39 @@ pub enum TrackDirection {
     Recv,
 }
 
-/// Media state transition is not allowed.
+/// Error occurring when media state transition is not allowed.
 #[derive(Clone, Debug, Display, From)]
-pub enum ProhibitedState {
-    /// Some [`Sender`] can't be disabled because it required.
-    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
+pub enum ProhibitedStateError {
+    /// [`Sender`] cannot be disabled because it's required.
+    #[display(fmt = "MediaExchangeState of Sender can't transit to \
                      disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
 }
 
-/// Errors returned from the [`MediaConnections::insert_local_tracks()`] method.
+/// Errors occurring in [`MediaConnections::insert_local_tracks()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum InsertLocalTracksError {
-    /// Occurs when a [`local::Track`] does not satisfy [`Sender`]'s
-    /// constraints.
-    #[display(fmt = "Provided Track does not satisfy senders constraints")]
+    /// [`local::Track`] doesn't satisfy [`Sender`]'s constraints.
+    #[display(fmt = "Provided Track doesn't satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// Occurs when there are not enough [`local::Track`]s being inserted into
-    /// senders.
+    /// There are not enough [`local::Track`]s being inserted into [`Sender`]s.
     #[display(fmt = "Provided stream does not have all necessary Tracks")]
     NotEnoughTracks,
 
-    /// Occurs if insertion of [`local::Track`] into [`Sender`] fails.
+    /// Insertion of a [`local::Track`] into a [`Sender`] fails.
     CouldNotInsertLocalTrack(sender::InsertTrackError),
 }
 
-/// Errors returned from the [`MediaConnections::get_mids()`] method.
+/// Errors occurring in [`MediaConnections::get_mids()`] method.
 #[derive(Clone, Debug, Display)]
 pub enum GetMidsError {
-    /// Occurs when cannot get the `mid` from the [`Sender`].
+    /// Cannot get the `mid` from a [`Sender`].
     #[display(fmt = "Peer has senders without mid")]
     SendersWithoutMid,
 
-    /// Occurs when cannot get the `mid` from the [`Receiver`].
+    /// Cannot get the `mid` from a [`Receiver`].
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
 }
@@ -417,14 +415,7 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// Errors with a [`GetMidsError::SendersWithoutMid`] if some [`Sender`]
-    /// doesn't have [mid].
-    ///
-    /// Errors with a [`GetMidsError::ReceiversWithoutMid`] if some [`Receiver`]
-    /// doesn't have [mid].
-    ///
-    /// [mid]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
+    /// See [`GetMidsError`] for details.
     pub fn get_mids(
         &self,
     ) -> Result<HashMap<TrackId, String>, Traced<GetMidsError>> {
@@ -540,16 +531,7 @@ impl MediaConnections {
     ///
     /// # Errors
     ///
-    /// With an [`InsertLocalTracksError::NotEnoughTracks`] if provided
-    /// [`HashMap`] doesn't contain required [`local::Track`].
-    ///
-    /// With an [`InsertLocalTracksError::InvalidMediaTrack`] if some
-    /// [`local::Track`] cannot be inserted into associated [`Sender`] because
-    /// of constraints mismatch.
-    ///
-    /// With an[`InsertLocalTracksError::CouldNotInsertLocalTrack`] if some
-    /// [`local::Track`] cannot be inserted into provided [`Sender`]s
-    /// transceiver.
+    /// See [`InsertLocalTracksError`] for details.
     ///
     /// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(

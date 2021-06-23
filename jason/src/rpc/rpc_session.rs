@@ -68,11 +68,11 @@ pub enum SessionError {
     NewConnectionInfo,
 }
 
-/// The reason of why [`RpcSession`] lost connection to the server.
+/// Reason of why a [`RpcSession`] lost connection with a server.
 #[derive(Clone, Debug, Display)]
 pub enum ConnectionLostReason {
-    /// Connection could not be established cause
-    /// [`WebSocketRpcClient::connect()`] call returned error.
+    /// Connection could not be established because
+    /// [`WebSocketRpcClient::connect()`] failed.
     ConnectError(Traced<RpcClientError>),
 
     /// Underlying [`WebSocketRpcClient`] reported that connection was lost.
@@ -82,6 +82,7 @@ pub enum ConnectionLostReason {
 impl JsCaused for ConnectionLostReason {
     type Error = platform::Error;
 
+    #[inline]
     fn name(&self) -> &'static str {
         match self {
             ConnectionLostReason::ConnectError(_) => "ConnectError",
@@ -89,6 +90,7 @@ impl JsCaused for ConnectionLostReason {
         }
     }
 
+    #[inline]
     fn js_cause(self) -> Option<Self::Error> {
         match self {
             ConnectionLostReason::ConnectError(err) => {

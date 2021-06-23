@@ -17,7 +17,7 @@ use crate::{
         component::SyncState,
         media::{
             media_exchange_state, mute_state, InTransition, MediaExchangeState,
-            MuteState, ProhibitedState,
+            MuteState, ProhibitedStateError,
         },
         MediaExchangeStateController, MediaState, MediaStateControllable,
         MuteStateController, TransceiverSide, UpdateLocalStreamError,
@@ -53,7 +53,7 @@ enum LocalTrackState {
     ///
     /// [`local::Track`]: crate::media::track::local::Track
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [2]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     Failed(Traced<UpdateLocalStreamError>),
 }
 
@@ -601,7 +601,7 @@ impl MediaStateControllable for State {
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,
-    ) -> Result<(), Traced<ProhibitedState>> {
+    ) -> Result<(), Traced<ProhibitedStateError>> {
         if self.media_type.required()
             && matches!(
                 desired_state,
@@ -611,7 +611,9 @@ impl MediaStateControllable for State {
                     )
             )
         {
-            Err(tracerr::new!(ProhibitedState::CannotDisableRequiredSender))
+            Err(tracerr::new!(
+                ProhibitedStateError::CannotDisableRequiredSender
+            ))
         } else {
             match desired_state {
                 MediaState::MediaExchange(desired_state) => {
