@@ -139,7 +139,7 @@ async fn error_get_local_stream_on_new_peer() {
     .await
     .unwrap();
 
-    let (cb, test_result) = js_callback!(|err: api::Error| {
+    let (cb, test_result) = js_callback!(|err: api::JasonError| {
         cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
         cb_assert_eq!(
             &err.message(),
@@ -2180,11 +2180,11 @@ mod set_local_media_settings {
         let (room, _rx) = get_test_room(Box::pin(event_rx));
         let room_handle = api::RoomHandle::from(room.new_handle());
 
-        let (cb, test_result) = js_callback!(|err: api::Error| {
+        let (cb, test_result) = js_callback!(|err: api::JasonError| {
             cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
             cb_assert_eq!(
                 err.message(),
-                "MediaExchangeState of Sender can't be transited into \
+                "MediaExchangeState of Sender cannot transit to \
                  disabled state, because this Sender is required."
             );
         });
@@ -2226,7 +2226,7 @@ mod set_local_media_settings {
     ///     1. `on_failed_local_media` was invoked.
     #[wasm_bindgen_test]
     async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-        let (cb, test_result) = js_callback!(|err: api::Error| {
+        let (cb, test_result) = js_callback!(|err: api::JasonError| {
             cb_assert_eq!(&err.name(), "InvalidLocalTracks");
             cb_assert_eq!(
                 &err.message(),

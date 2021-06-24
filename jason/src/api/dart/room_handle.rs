@@ -7,12 +7,11 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, DartFuture, DartResult, FormatException,
-            IntoDartFuture, RpcClientException, StateError,
+            IntoDartFuture as _, RpcClientException, StateError,
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
-    peer::FailedLocalMediaError,
     platform,
     room::{
         ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -36,12 +35,6 @@ impl From<Traced<HandleDetachedError>> for DartError {
     }
 }
 
-impl From<Traced<FailedLocalMediaError>> for DartError {
-    fn from(_: Traced<FailedLocalMediaError>) -> Self {
-        todo!()
-    }
-}
-
 impl From<Traced<RoomJoinError>> for DartError {
     #[inline]
     fn from(err: Traced<RoomJoinError>) -> Self {
@@ -49,15 +42,14 @@ impl From<Traced<RoomJoinError>> for DartError {
         let message = err.to_string();
 
         match err {
-            RoomJoinError::Detached => {
-                StateError::new("ReconnectHandle is in detached state.").into()
+            RoomJoinError::Detached | RoomJoinError::CallbackNotSet(_) => {
+                StateError::new(message).into()
             }
-            RoomJoinError::CallbackNotSet(_) => StateError::new(message).into(),
             RoomJoinError::ConnectionInfoParse(_) => {
                 FormatException::new(message).into()
             }
             RoomJoinError::SessionError(err) => {
-                RpcClientException::from((err, trace)).into()
+                RpcClientException::from(Traced::from_parts(err, trace)).into()
             }
         }
     }

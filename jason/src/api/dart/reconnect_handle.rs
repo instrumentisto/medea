@@ -34,7 +34,7 @@ impl From<Traced<ReconnectError>> for DartError {
                 StateError::new("ReconnectHandle is in detached state.").into()
             }
             ReconnectError::Session(err) => {
-                RpcClientException::from((err, trace)).into()
+                RpcClientException::from(Traced::from_parts(err, trace)).into()
             }
         }
     }
@@ -153,7 +153,7 @@ mod mock {
 
     use crate::{
         api::dart::utils::{
-            DartError, DartFuture, DartResult, IntoDartFuture,
+            DartError, DartFuture, DartResult, IntoDartFuture as _,
             RpcClientException, RpcClientExceptionKind,
         },
         platform,
@@ -205,15 +205,14 @@ mod mock {
     #[no_mangle]
     pub unsafe extern "C" fn returns_future_rpc_client_exception(
         cause: Dart_Handle,
-    ) -> DartFuture<Result<(), Traced<RpcClientException>>> {
+    ) -> DartFuture<Result<(), DartError>> {
         let err = RpcClientException::new(
             RpcClientExceptionKind::SessionFinished,
             "RpcClientException::SessionFinished",
             Some(platform::Error::from(cause)),
             Trace::new(vec![tracerr::new_frame!()]),
-        )
-        .into();
+        );
 
-        async move { Result::<(), _>::Err(err) }.into_dart_future()
+        async move { Result::<(), _>::Err(err.into()) }.into_dart_future()
     }
 }

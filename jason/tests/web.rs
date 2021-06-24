@@ -140,7 +140,7 @@ extern "C" {
 
 #[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
-    fn get_jason_error(err: JsValue) -> api::Error;
+    fn get_jason_error(err: JsValue) -> api::JasonError;
 }
 
 #[wasm_bindgen(

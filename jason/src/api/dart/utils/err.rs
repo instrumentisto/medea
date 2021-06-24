@@ -5,7 +5,7 @@ use std::{borrow::Cow, ptr};
 use dart_sys::Dart_Handle;
 use derive_more::Into;
 use libc::c_char;
-use tracerr::Trace;
+use tracerr::{Trace, Traced};
 
 use crate::{
     api::dart::{utils::string_into_c_str, DartValue},
@@ -427,7 +427,8 @@ pub enum RpcClientExceptionKind {
     InternalError,
 }
 
-/// Exception thrown when accessing media devices.
+/// Exceptions thrown from an RPC client that implements messaging with media
+/// server.
 pub struct RpcClientException {
     /// Concrete error kind of this [`RpcClientException`].
     kind: RpcClientExceptionKind,
@@ -476,11 +477,12 @@ impl From<RpcClientException> for DartError {
     }
 }
 
-impl From<(SessionError, Trace)> for RpcClientException {
-    fn from((err, trace): (SessionError, Trace)) -> Self {
+impl From<Traced<SessionError>> for RpcClientException {
+    fn from(err: Traced<SessionError>) -> Self {
         use RpcClientExceptionKind as Kind;
         use SessionError as SE;
 
+        let (err, trace) = err.into_parts();
         let message = err.to_string();
 
         let mut cause = None;

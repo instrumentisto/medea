@@ -170,7 +170,7 @@ impl Component {
         .map_err(|e| {
             drop(peer.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
-                    error: tracerr::map_from(e.clone()),
+                    error: e.clone().into(),
                 },
             ));
             e
