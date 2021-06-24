@@ -146,13 +146,20 @@ class RoomHandle {
   /// provided [Pointer].
   RoomHandle(this.ptr);
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Connects to a media server and joins the `Room` with the provided
   /// authorization [token].
   ///
   /// Authorization token has a fixed format:
   /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
   /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed or if some
+  /// mandatory callback is not set. These callbacks are:
+  /// [RoomHandle.onConnectionLoss] and [RoomHandle.onFailedLocalMedia].
+  ///
+  /// Throws [FormatException] if the provided [token] string has bad format.
+  ///
+  /// Throws `RpcClientException` if could not connect to media server.
   Future<void> join(String token) async {
     var tokenPtr = token.toNativeUtf8();
     try {

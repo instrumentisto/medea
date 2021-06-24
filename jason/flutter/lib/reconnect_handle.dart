@@ -37,17 +37,22 @@ class ReconnectHandle {
   /// provided [Pointer].
   ReconnectHandle(this.ptr);
 
-  // TODO: Add throws docs when all errors are implemented.
   /// Tries to reconnect a `Room` after the provided delay in milliseconds.
   ///
   /// If the `Room` is already reconnecting then new reconnection attempt won't
   /// be performed. Instead, it will wait for the first reconnection attempt
   /// result and use it here.
+  ///
+  /// Throws `RpcClientException` if reconnect attempt fails.
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Converts the provided [delayMs] into an `u32`. Throws an [ArgumentError]
+  /// if conversion fails.
   Future<void> reconnectWithDelay(int delayMs) async {
     await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future);
   }
 
-  // TODO: Add throws docs when all errors are implemented.
   /// Tries to reconnect a `Room` in a loop with a growing backoff delay.
   ///
   /// The first attempt will be performed immediately, and the second attempt
@@ -67,6 +72,13 @@ class ReconnectHandle {
   /// If the `Room` is already reconnecting then new reconnection attempt won't
   /// be performed. Instead, it will wait for the first reconnection attempt
   /// result and use it here.
+  ///
+  /// Throws `RpcClientException` if reconnect attempt fails.
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Converts the provided [startingDelayMs], [maxDelay] and [maxElapsedTimeMs]
+  /// into an `u32`s. Throws an [ArgumentError] if any conversion fails.
   Future<void> reconnectWithBackoff(
       int startingDelayMs, double multiplier, int maxDelay,
       [int? maxElapsedTimeMs]) async {

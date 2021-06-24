@@ -28,9 +28,10 @@ use crate::{
     },
     peer::{
         self, media::ProhibitedStateError, media_exchange_state, mute_state,
-        InsertLocalTracksError, LocalStreamUpdateCriteria, MediaState,
-        PeerConnection, PeerEvent, PeerEventHandler, TrackDirection,
-        TracksRequestError, UpdateLocalStreamError,
+        FailedLocalMediaError, InsertLocalTracksError,
+        LocalStreamUpdateCriteria, MediaState, PeerConnection, PeerEvent,
+        PeerEventHandler, TrackDirection, TracksRequestError,
+        UpdateLocalStreamError,
     },
     platform,
     rpc::{
@@ -1312,10 +1313,8 @@ impl InnerRoom {
                 .media_manager
                 .get_tracks(req)
                 .await
-                .map_err(tracerr::map_from_and_wrap!())
-                .map_err(|e: Traced<MediaManagerError>| {
-                    self.on_failed_local_media
-                        .call1(api::Error::from(e.clone()));
+                .map_err(|e| {
+                    self.on_failed_local_media.call1(e.clone());
 
                     e
                 })
@@ -1810,7 +1809,7 @@ impl PeerEventHandler for InnerRoom {
     /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(
         &self,
-        error: Traced<PeerError>,
+        error: Traced<FailedLocalMediaError>,
     ) -> Self::Output {
         self.on_failed_local_media.call1(api::Error::from(error));
         Ok(())

@@ -168,10 +168,12 @@ impl Component {
             peer.track_events_sender.clone(),
         )
         .map_err(|e| {
-                drop(peer.peer_events_sender.unbounded_send(
-                    PeerEvent::FailedLocalMedia { error: e.clone() },
-                ));
-                e
+            drop(peer.peer_events_sender.unbounded_send(
+                PeerEvent::FailedLocalMedia {
+                    error: tracerr::map_from(e.clone()),
+                },
+            ));
+            e
         })
         .map_err(tracerr::map_from_and_wrap!())?;
         peer.media_connections

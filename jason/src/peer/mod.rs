@@ -90,6 +90,17 @@ pub enum TrackEvent {
     },
 }
 
+/// Add docs
+#[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum FailedLocalMediaError {
+    /// Add docs
+    UpdateLocalStreamError(UpdateLocalStreamError),
+
+    /// Add docs
+    SenderCreateError(sender::CreateError),
+}
+
 /// Events emitted from [`platform::RtcPeerConnection`].
 #[dispatchable(self: &Self, async_trait(?Send))]
 #[derive(Clone)]
@@ -180,7 +191,7 @@ pub enum PeerEvent {
     /// `on_failed_local_stream` callback should be called.
     FailedLocalMedia {
         /// Reasons of local media updating fail.
-        error: Traced<PeerError>,
+        error: Traced<FailedLocalMediaError>,
     },
 
     /// [`Component`] generated a new SDP answer.
@@ -679,7 +690,9 @@ impl PeerConnection {
     > {
         self.inner_update_local_stream(criteria).await.map_err(|e| {
             drop(self.peer_events_sender.unbounded_send(
-                PeerEvent::FailedLocalMedia { error: e.clone() },
+                PeerEvent::FailedLocalMedia {
+                    error: tracerr::map_from(e.clone()),
+                },
             ));
             e
         })

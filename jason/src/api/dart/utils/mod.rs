@@ -15,8 +15,9 @@ use crate::{
 pub use self::{
     arrays::PtrArray,
     err::{
-        ArgumentError, DartError, EnumerateDevicesException,
-        LocalMediaInitException, LocalMediaInitExceptionKind, StateError,
+        ArgumentError, DartError, EnumerateDevicesException, FormatException,
+        LocalMediaInitException, LocalMediaInitExceptionKind,
+        RpcClientException, RpcClientExceptionKind, StateError,
     },
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},

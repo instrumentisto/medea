@@ -303,7 +303,7 @@ void main() {
     var jason = Jason();
     var room = jason.initRoom();
 
-    await room.join('token');
+    await room.join('wss://example.com/room/Alice?token=777');
     await room.setLocalMediaSettings(MediaStreamSettings(), true, false);
     await room.muteAudio();
     await room.unmuteAudio();
@@ -317,19 +317,39 @@ void main() {
     await room.enableRemoteAudio();
     await room.disableRemoteVideo();
 
-    var exception;
+    var stateErr;
     try {
       await room.enableRemoteVideo();
     } catch (e) {
-      exception = e;
+      stateErr = e;
     }
     expect(
-        exception,
+        stateErr,
         allOf(isStateError,
             predicate((e) => e.message == 'RoomHandle is in detached state.')));
+
+    var formatExc;
+    try {
+      await room.join('obviously bad url');
+    } catch (e) {
+      formatExc = e;
+    }
+    expect(
+        formatExc,
+        allOf(
+            isFormatException,
+            predicate(
+                (e) => e.message.contains('relative URL without a base'))));
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {
+    final returnsRpcClientException =
+        dl.lookupFunction<Result Function(Handle), Result Function(Object)>(
+            'returns_enumerate_devices_exception');
+    final returnsFutureWithRpcClientException =
+        dl.lookupFunction<Handle Function(Handle), Object Function(Object)>(
+            'returns_future_enumerate_devices_exception');
+
     var jason = Jason();
     var room = jason.initRoom();
 

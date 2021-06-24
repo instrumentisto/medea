@@ -6,12 +6,13 @@ use tracerr::Traced;
 use crate::{
     api::dart::{
         utils::{
-            c_str_into_string, DartFuture, DartResult, IntoDartFuture,
-            StateError,
+            c_str_into_string, DartFuture, DartResult, FormatException,
+            IntoDartFuture, RpcClientException, StateError,
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
+    peer::FailedLocalMediaError,
     platform,
     room::{
         ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -35,10 +36,30 @@ impl From<Traced<HandleDetachedError>> for DartError {
     }
 }
 
+impl From<Traced<FailedLocalMediaError>> for DartError {
+    fn from(_: Traced<FailedLocalMediaError>) -> Self {
+        todo!()
+    }
+}
+
 impl From<Traced<RoomJoinError>> for DartError {
     #[inline]
-    fn from(_: Traced<RoomJoinError>) -> Self {
-        todo!()
+    fn from(err: Traced<RoomJoinError>) -> Self {
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        match err {
+            RoomJoinError::Detached => {
+                StateError::new("ReconnectHandle is in detached state.").into()
+            }
+            RoomJoinError::CallbackNotSet(_) => StateError::new(message).into(),
+            RoomJoinError::ConnectionInfoParse(_) => {
+                FormatException::new(message).into()
+            }
+            RoomJoinError::SessionError(err) => {
+                RpcClientException::from((err, trace)).into()
+            }
+        }
     }
 }
 
@@ -451,7 +472,7 @@ mod mock {
             ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
             RoomCloseReason, RoomJoinError,
         },
-        rpc::{ClientDisconnect, CloseReason},
+        rpc::{ClientDisconnect, CloseReason, ConnectionInfo},
     };
 
     #[derive(Clone)]
@@ -496,8 +517,11 @@ mod mock {
 
         pub async fn join(
             &self,
-            _token: String,
+            token: String,
         ) -> Result<(), Traced<RoomJoinError>> {
+            let _: ConnectionInfo =
+                token.parse().map_err(tracerr::map_from_and_wrap!())?;
+
             Ok(())
         }
 
