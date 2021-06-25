@@ -87,7 +87,7 @@ impl ConnectionInfo {
 #[js(error = "platform::Error")]
 pub enum ConnectionInfoParseError {
     /// [`Url::parse`] returned error.
-    #[display(fmt = "Failed to parse provided URL: {:?}", _0)]
+    #[display(fmt = "Failed to parse provided URL: {}", _0)]
     UrlParse(url::ParseError),
 
     /// Provided URL doesn't have important segments.

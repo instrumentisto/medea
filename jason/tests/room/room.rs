@@ -2184,7 +2184,7 @@ mod set_local_media_settings {
             cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
             cb_assert_eq!(
                 err.message(),
-                "MediaExchangeState of Sender can't be transited into \
+                "MediaExchangeState of Sender cannot transit to \
                  disabled state, because this Sender is required."
             );
         });

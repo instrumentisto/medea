@@ -303,7 +303,7 @@ void main() {
     var jason = Jason();
     var room = jason.initRoom();
 
-    await room.join('token');
+    await room.join('wss://example.com/room/Alice?token=777');
     await room.setLocalMediaSettings(MediaStreamSettings(), true, false);
     await room.muteAudio();
     await room.unmuteAudio();
@@ -317,19 +317,39 @@ void main() {
     await room.enableRemoteAudio();
     await room.disableRemoteVideo();
 
-    var exception;
+    var stateErr;
     try {
       await room.enableRemoteVideo();
     } catch (e) {
-      exception = e;
+      stateErr = e;
     }
     expect(
-        exception,
+        stateErr,
         allOf(isStateError,
             predicate((e) => e.message == 'RoomHandle is in detached state.')));
+
+    var formatExc;
+    try {
+      await room.join('obviously bad url');
+    } catch (e) {
+      formatExc = e;
+    }
+    expect(
+        formatExc,
+        allOf(
+            isFormatException,
+            predicate(
+                (e) => e.message.contains('relative URL without a base'))));
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {
+    final returnsRpcClientException =
+        dl.lookupFunction<Result Function(Handle), Result Function(Object)>(
+            'returns_rpc_client_exception');
+    final returnsFutureWithRpcClientException =
+        dl.lookupFunction<Handle Function(Handle), Object Function(Object)>(
+            'returns_future_rpc_client_exception');
+
     var jason = Jason();
     var room = jason.initRoom();
 
@@ -376,11 +396,35 @@ void main() {
     } catch (e) {
       exception4 = e;
     }
-    expect(exception3, isArgumentError);
+    expect(exception4, isArgumentError);
     var argumentError2 = exception4 as ArgumentError;
     expect(argumentError2.invalidValue, equals(-4));
     expect(argumentError2.name, 'maxElapsedTimeMs');
     expect(argumentError2.message, 'Expected u32');
+
+    expect(
+        () => returnsRpcClientException('Dart err cause1').unwrap(),
+        throwsA(predicate((e) =>
+            e is RpcClientException &&
+            e.kind == RpcClientExceptionKind.InternalError &&
+            e.cause == 'Dart err cause1' &&
+            e.message == 'RpcClientException::InternalError' &&
+            e.nativeStackTrace.contains('at jason/src'))));
+
+    var exception5;
+    try {
+      await (returnsFutureWithRpcClientException('Dart err cause2') as Future);
+    } catch (e) {
+      exception5 = e;
+    }
+    expect(
+        exception5,
+        predicate((e) =>
+            e is RpcClientException &&
+            e.kind == RpcClientExceptionKind.SessionFinished &&
+            e.message == 'RpcClientException::SessionFinished' &&
+            e.cause == 'Dart err cause2' &&
+            e.nativeStackTrace.contains('at jason/src')));
   });
 
   final returnsInputDevicePtr =

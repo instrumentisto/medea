@@ -1,65 +1,26 @@
 //! Reconnection for [`RpcSession`].
 
-use std::{borrow::Cow, rc::Weak, time::Duration};
+use std::{rc::Weak, time::Duration};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use tracerr::Traced;
 
 use crate::{
     platform,
-    rpc::{
-        rpc_session::ConnectionLostReason, BackoffDelayer, CloseReason,
-        RpcSession, SessionError,
-    },
+    rpc::{BackoffDelayer, RpcSession, SessionError},
     utils::JsCaused,
 };
 
 /// Errors occurring in a [`ReconnectHandle`].
-#[derive(Clone, Debug, Display, JsCaused)]
+#[derive(Clone, Debug, From, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum ReconnectError {
-    /// Connection with a server was lost.
-    ///
-    /// This usually means that some transport error occurred, so a client can
-    /// continue performing reconnecting attempts.
-    #[display(fmt = "Connection with a server was lost: {}", _0)]
-    ConnectionLost(ConnectionLostReason),
-
-    /// Could not authorize an RPC session.
-    ///
-    /// This usually means that authentication data a client provides is
-    /// obsolete.
-    #[display(fmt = "Failed to authorize RPC session")]
-    AuthorizationFailed,
-
-    /// RPC session has benn finished. This is a terminal state.
-    #[display(fmt = "RPC session finished with {:?} close reason", _0)]
-    SessionFinished(CloseReason),
-
-    /// Internal error that is not meant to be handled by external users.
-    ///
-    /// This is a programmatic error.
-    Internal(Cow<'static, str>),
+    /// Some [`SessionError`] has occurred while reconnecting.
+    Session(#[js(cause)] SessionError),
 
     /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
     #[display(fmt = "ReconnectHandle is in detached state")]
     Detached,
-}
-
-impl From<SessionError> for ReconnectError {
-    #[inline]
-    fn from(err: SessionError) -> Self {
-        use SessionError as SE;
-        match err {
-            SE::SessionFinished(cr) => Self::SessionFinished(cr),
-            SE::NoCredentials
-            | SE::SessionUnexpectedlyDropped
-            | SE::NewConnectionInfo => Self::Internal(err.to_string().into()),
-            SE::AuthorizationFailed => Self::AuthorizationFailed,
-            SE::RpcClient(client) => Self::Internal(client.to_string().into()),
-            SE::ConnectionLost(clr) => Self::ConnectionLost(clr),
-        }
-    }
 }
 
 /// External handle used to reconnect to a media server when connection is lost.

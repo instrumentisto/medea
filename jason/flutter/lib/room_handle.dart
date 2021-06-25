@@ -146,13 +146,20 @@ class RoomHandle {
   /// provided [Pointer].
   RoomHandle(this.ptr);
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Connects to a media server and joins the `Room` with the provided
   /// authorization [token].
   ///
   /// Authorization token has a fixed format:
   /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
   /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed or if some
+  /// mandatory callback is not set. These callbacks are:
+  /// [RoomHandle.onConnectionLoss] and [RoomHandle.onFailedLocalMedia].
+  ///
+  /// Throws [FormatException] if the provided [token] string has bad format.
+  ///
+  /// Throws `RpcClientException` if could not connect to media server.
   Future<void> join(String token) async {
     var tokenPtr = token.toNativeUtf8();
     try {
@@ -292,25 +299,26 @@ class RoomHandle {
     await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when a new `Connection` with some remote `Peer`
   /// is established.
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
   void onNewConnection(void Function(ConnectionHandle) f) {
     _onNewConnection(ptr.getInnerPtr(), (t) {
       f(ConnectionHandle(NullablePointer(t)));
     }).unwrap();
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when this `Room` is closed, providing a
   /// [RoomCloseReason].
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
   void onClose(void Function(RoomCloseReason) f) {
     _onClose(ptr.getInnerPtr(), (t) {
       f(RoomCloseReason(NullablePointer(t)));
     }).unwrap();
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when a new [LocalMediaTrack] is added to this
   /// `Room`.
   ///
@@ -319,15 +327,18 @@ class RoomHandle {
   /// 2. [RoomHandle.enableAudio()]/[RoomHandle.enableVideo()] is called.
   /// 3. [MediaStreamSettings] were updated via
   ///    [RoomHandle.setLocalMediaSettings()] method.
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
   void onLocalTrack(void Function(LocalMediaTrack) f) {
     _onLocalTrack(ptr.getInnerPtr(), (t) {
       f(LocalMediaTrack(NullablePointer(t)));
     }).unwrap();
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when a connection with a media server is lost,
   /// providing a [ReconnectHandle].
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
   void onConnectionLoss(void Function(ReconnectHandle) f) {
     _onConnectionLoss(ptr.getInnerPtr(), (t) {
       f(ReconnectHandle(NullablePointer(t)));
@@ -340,7 +351,7 @@ class RoomHandle {
   // ///
   // /// # Errors
   // ///
-  // /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+  // /// Throws [StateError] if the underlying [Pointer] has been freed.
   // void onFailedLocalMedia(void Function(ReconnectHandle) f) {
   //   _onConnectionLoss(ptr.getInnerPtr(), (t) {
   //     f(ReconnectHandle(NullablePointer(t)));

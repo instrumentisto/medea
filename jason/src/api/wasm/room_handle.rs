@@ -306,7 +306,6 @@ impl RoomHandle {
         future_to_promise(async move {
             this.disable_video(source_kind.map(Into::into))
                 .await
-                .map_err(JasonError::from)
                 .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })

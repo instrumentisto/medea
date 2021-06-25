@@ -6,8 +6,8 @@ use tracerr::Traced;
 use crate::{
     api::dart::{
         utils::{
-            c_str_into_string, DartFuture, DartResult, IntoDartFuture,
-            StateError,
+            c_str_into_string, DartFuture, DartResult, FormatException,
+            IntoDartFuture as _, RpcClientException, StateError,
         },
         DartValueArg, ForeignClass,
     },
@@ -37,8 +37,21 @@ impl From<Traced<HandleDetachedError>> for DartError {
 
 impl From<Traced<RoomJoinError>> for DartError {
     #[inline]
-    fn from(_: Traced<RoomJoinError>) -> Self {
-        todo!()
+    fn from(err: Traced<RoomJoinError>) -> Self {
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        match err {
+            RoomJoinError::Detached | RoomJoinError::CallbackNotSet(_) => {
+                StateError::new(message).into()
+            }
+            RoomJoinError::ConnectionInfoParse(_) => {
+                FormatException::new(message).into()
+            }
+            RoomJoinError::SessionError(err) => {
+                RpcClientException::from(Traced::from_parts(err, trace)).into()
+            }
+        }
     }
 }
 
@@ -451,7 +464,7 @@ mod mock {
             ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
             RoomCloseReason, RoomJoinError,
         },
-        rpc::{ClientDisconnect, CloseReason},
+        rpc::{ClientDisconnect, CloseReason, ConnectionInfo},
     };
 
     #[derive(Clone)]
@@ -496,9 +509,12 @@ mod mock {
 
         pub async fn join(
             &self,
-            _token: String,
+            token: String,
         ) -> Result<(), Traced<RoomJoinError>> {
-            Ok(())
+            token
+                .parse()
+                .map_err(tracerr::map_from_and_wrap!())
+                .map(drop)
         }
 
         // pub fn on_failed_local_media(

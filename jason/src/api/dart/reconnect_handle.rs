@@ -4,7 +4,9 @@ use tracerr::Traced;
 
 use crate::{
     api::dart::{
-        utils::{ArgumentError, DartFuture, IntoDartFuture},
+        utils::{
+            ArgumentError, DartFuture, IntoDartFuture, RpcClientException,
+        },
         DartValueArg,
     },
     rpc::ReconnectError,
@@ -25,15 +27,14 @@ impl ForeignClass for ReconnectHandle {}
 impl From<Traced<ReconnectError>> for DartError {
     #[inline]
     fn from(err: Traced<ReconnectError>) -> Self {
-        match err.into_inner() {
+        let (err, trace) = err.into_parts();
+
+        match err {
             ReconnectError::Detached => {
                 StateError::new("ReconnectHandle is in detached state.").into()
             }
-            ReconnectError::ConnectionLost(_)
-            | ReconnectError::AuthorizationFailed
-            | ReconnectError::SessionFinished(_)
-            | ReconnectError::Internal(_) => {
-                todo!()
+            ReconnectError::Session(err) => {
+                RpcClientException::from(Traced::from_parts(err, trace)).into()
             }
         }
     }
@@ -147,9 +148,17 @@ pub unsafe extern "C" fn ReconnectHandle__free(
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use tracerr::Traced;
+    use dart_sys::Dart_Handle;
+    use tracerr::{Trace, Traced};
 
-    use crate::rpc::{ReconnectError, ReconnectHandle as CoreReconnectHandle};
+    use crate::{
+        api::dart::utils::{
+            DartError, DartFuture, DartResult, IntoDartFuture as _,
+            RpcClientException, RpcClientExceptionKind,
+        },
+        platform,
+        rpc::{ReconnectError, ReconnectHandle as CoreReconnectHandle},
+    };
 
     #[derive(Clone)]
     pub struct ReconnectHandle;
@@ -177,5 +186,33 @@ mod mock {
         ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn returns_rpc_client_exception(
+        cause: Dart_Handle,
+    ) -> DartResult {
+        let err = RpcClientException::new(
+            RpcClientExceptionKind::InternalError,
+            "RpcClientException::InternalError",
+            Some(platform::Error::from(cause)),
+            Trace::new(vec![tracerr::new_frame!()]),
+        );
+
+        DartError::from(err).into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn returns_future_rpc_client_exception(
+        cause: Dart_Handle,
+    ) -> DartFuture<Result<(), DartError>> {
+        let err = RpcClientException::new(
+            RpcClientExceptionKind::SessionFinished,
+            "RpcClientException::SessionFinished",
+            Some(platform::Error::from(cause)),
+            Trace::new(vec![tracerr::new_frame!()]),
+        );
+
+        async move { Result::<(), _>::Err(err.into()) }.into_dart_future()
     }
 }

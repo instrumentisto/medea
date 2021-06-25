@@ -30,7 +30,7 @@ use crate::{
     utils::JsCaused,
 };
 
-/// Errors which are can be returned from the [`WebSocketRpcSession`].
+/// Errors which can be returned from the [`WebSocketRpcSession`].
 #[derive(Clone, Debug, From, JsCaused, Display)]
 #[js(error = "platform::Error")]
 pub enum SessionError {
