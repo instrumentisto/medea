@@ -376,7 +376,7 @@ impl From<EnumerateDevicesException> for DartError {
     }
 }
 
-/// Exception thrown when a string or some other data does not have an expected
+/// Exception thrown when a string or some other data doesn't have an expected
 /// format and cannot be parsed or processed.
 ///
 /// It can be converted into a [`DartError`] and passed to Dart.
@@ -444,8 +444,8 @@ pub struct RpcClientException {
 }
 
 impl RpcClientException {
-    /// Creates a new [`RpcClientException`] from the provided error
-    /// `kind`, `message`, optional `cause` and `trace`.
+    /// Creates a new [`RpcClientException`] from the provided error `kind`,
+    /// `message`, optional `cause` and `trace`.
     #[inline]
     #[must_use]
     pub fn new<M: Into<Cow<'static, str>>>(

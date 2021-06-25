@@ -46,10 +46,7 @@ impl ReconnectHandle {
     ///
     /// # Errors
     ///
-    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`ReconnectError::Session`] if error while reconnecting has
-    /// occurred.
+    /// See [`ReconnectError`] for details.
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
@@ -88,10 +85,7 @@ impl ReconnectHandle {
     ///
     /// # Errors
     ///
-    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`ReconnectError::Session`] if error while reconnecting has
-    /// occurred and `max_elapsed_time_ms` is provided.
+    /// See [`ReconnectError`] for details.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,

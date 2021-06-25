@@ -511,10 +511,10 @@ mod mock {
             &self,
             token: String,
         ) -> Result<(), Traced<RoomJoinError>> {
-            let _: ConnectionInfo =
-                token.parse().map_err(tracerr::map_from_and_wrap!())?;
-
-            Ok(())
+            token
+                .parse()
+                .map_err(tracerr::map_from_and_wrap!())
+                .map(drop)
         }
 
         // pub fn on_failed_local_media(

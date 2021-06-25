@@ -166,8 +166,7 @@ enum RpcClientExceptionKind {
 
   /// Could not authorize an RPC session.
   ///
-  /// This usually means that authentication data a client provides is
-  /// obsolete.
+  /// This usually means that authentication data a client provides is obsolete.
   AuthorizationFailed,
 
   /// RPC session has been finished. This is a terminal state.
