@@ -88,11 +88,7 @@ pub trait PeerUpdatesSubscriber: fmt::Debug {
 }
 
 #[cfg(test)]
-impl fmt::Debug for MockPeerUpdatesSubscriber {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("MockPeerUpdatesSubscriber").finish()
-    }
-}
+impl_debug_by_struct_name!(MockPeerUpdatesSubscriber);
 
 /// [`Peer`] doesn't have remote [SDP] and is waiting for local [SDP].
 ///

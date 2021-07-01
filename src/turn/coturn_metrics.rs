@@ -9,8 +9,8 @@ use std::{
 };
 
 use actix::{
-    fut::LocalBoxActorFuture, Actor, ActorFutureExt as _, AsyncContext,
-    StreamHandler, WrapFuture,
+    fut::LocalBoxActorFuture, Actor, ActorFutureExt as _,
+    ActorTryFutureExt as _, AsyncContext, StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, future, StreamExt as _};
 use redis::{ConnectionInfo, RedisError};
@@ -87,8 +87,7 @@ impl CoturnMetricsService {
                 Ok(pubsub)
             }
             .into_actor(self)
-            .map(|res: Result<_, RedisError>, this, ctx| {
-                let mut pubsub = res?;
+            .map_ok(|mut pubsub, this, ctx| {
                 ctx.spawn(
                     async move {
                         let mut msg_stream = pubsub.on_message();
@@ -101,8 +100,6 @@ impl CoturnMetricsService {
                     .into_actor(this),
                 );
                 ctx.add_stream(msg_stream);
-
-                Ok(())
             }),
         )
     }

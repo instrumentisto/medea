@@ -9,9 +9,9 @@ mod rpc_server;
 use std::{rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
-    fut::LocalBoxActorFuture, Actor, ActorFutureExt as _, Addr,
-    AsyncContext as _, AtomicResponse, Context, Handler, MailboxError,
-    WrapFuture as _,
+    fut::LocalBoxActorFuture, Actor, ActorFutureExt as _,
+    ActorTryFutureExt as _, Addr, AsyncContext as _, AtomicResponse, Context,
+    Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -274,10 +274,7 @@ impl Room {
                 }
             });
 
-        Box::pin(
-            actix_try_join_all(connect_members_tasks)
-                .map(|result, _, _| result.map(drop)),
-        )
+        Box::pin(actix_try_join_all(connect_members_tasks).map_ok(|_, _, _| ()))
     }
 
     /// Signals about removing [`Member`]'s [`Peer`]s.

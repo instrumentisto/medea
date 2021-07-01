@@ -1405,7 +1405,6 @@ mod test {
     }
 
     #[actix_rt::test]
-    #[ignore] // TODO: Unignore on `actix-rt = 2.2`.
     async fn close_connection_when_no_active_sessions() {
         let mut serv = test_server(|| -> WsSession {
             let mut rpc_server_repo = MockRpcServerRepository::new();

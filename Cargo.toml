@@ -36,11 +36,10 @@ opt-level = "s"  # Tell rustc to optimize for small code size.
 split-debuginfo = "unpacked"
 
 [dependencies]
-actix = "=0.11.0-beta.3"
-actix-http = "=3.0.0-beta.5"
-actix-service = "=2.0.0-beta.5"  # only to pin
-actix-web = "=4.0.0-beta.5"
-actix-web-actors = "=4.0.0-beta.4"
+actix = "0.12"
+actix-http = "=3.0.0-beta.8"
+actix-web = "=4.0.0-beta.8"
+actix-web-actors = "=4.0.0-beta.6"
 argon2 = { version = "0.8", package = "rust-argon2", default-features = false }
 async-trait = "0.1"
 bytes = "1.0"
@@ -92,11 +91,12 @@ url = "2.1"
     features = ["tokio-comp"]
 
 [dev-dependencies]
-actix-codec = "=0.4.0-beta.1"
+actix-codec = "0.4"
 actix-http-test = "=3.0.0-beta.4"
 actix-rt = "2.2"
+actix-service = "2.0"
 async-recursion = "0.3"
-awc = "=3.0.0-beta.4"
+awc = "=3.0.0-beta.7"
 cucumber_rust = { version = "0.8", features = ["macros"] }
 derive_builder = "0.10"
 fantoccini = "0.17"
