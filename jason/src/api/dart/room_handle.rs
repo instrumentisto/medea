@@ -512,7 +512,7 @@ mod mock {
             token: String,
         ) -> Result<(), Traced<RoomJoinError>> {
             token
-                .parse()
+                .parse::<ConnectionInfo>()
                 .map_err(tracerr::map_from_and_wrap!())
                 .map(drop)
         }
