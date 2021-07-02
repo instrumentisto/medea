@@ -286,6 +286,8 @@ jobs:
           api-level: ${{ steps.ndk-version.outputs.min }}
           target: google_apis
           arch: x86_64
+          # https://github.com/ReactiveCircus/android-emulator-runner/issues/160
+          emulator-build: 7425822
           profile: Nexus 6
           script: make test.flutter
       - name: Test on target Android NDK version
@@ -294,6 +296,8 @@ jobs:
           api-level: ${{ steps.ndk-version.outputs.target }}
           target: google_apis
           arch: x86_64
+          # https://github.com/ReactiveCircus/android-emulator-runner/issues/160
+          emulator-build: 7425822
           profile: Nexus 6
           script: make test.flutter
 

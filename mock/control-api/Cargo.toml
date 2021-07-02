@@ -13,10 +13,10 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-actix = "=0.11.0-beta.3"
-actix-cors = "=0.6.0-beta.1"
-actix-web = "=4.0.0-beta.5"
-actix-web-actors = "=4.0.0-beta.4"
+actix = "0.12"
+actix-cors = "=0.6.0-beta.2"
+actix-web = "=4.0.0-beta.8"
+actix-web-actors = "=4.0.0-beta.6"
 clap = "2.33"
 derive_more = "0.99"
 dotenv = "0.15"

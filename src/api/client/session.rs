@@ -44,9 +44,6 @@ pub trait RpcServerRepository: Debug {
     fn get(&self, room_id: &RoomId) -> Option<Box<dyn RpcServer>>;
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockRpcServerRepository);
-
 /// Used to generate [`WsSession`] IDs.
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -1405,7 +1402,6 @@ mod test {
     }
 
     #[actix_rt::test]
-    #[ignore] // TODO: Unignore on `actix-rt = 2.2`.
     async fn close_connection_when_no_active_sessions() {
         let mut serv = test_server(|| -> WsSession {
             let mut rpc_server_repo = MockRpcServerRepository::new();

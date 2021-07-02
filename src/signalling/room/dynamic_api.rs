@@ -9,8 +9,8 @@ use std::{
 };
 
 use actix::{
-    ActorFutureExt as _, AsyncContext, AtomicResponse, Context, Handler,
-    Message, WrapFuture as _,
+    ActorFutureExt as _, ActorTryFutureExt as _, AsyncContext, AtomicResponse,
+    Context, Handler, Message, WrapFuture as _,
 };
 use medea_client_api_proto::{CloseReason, MemberId};
 use medea_control_api_proto::grpc::api as proto;
@@ -242,22 +242,20 @@ impl Room {
 
         if self.members.member_has_connection(&member_id) {
             ctx.spawn(
-                self.init_member_connections(&member).map(
-                    move |res, this, ctx| {
-                        if let Err(e) = res {
-                            error!(
-                                "Failed to interconnect Members, because {}",
-                                e,
-                            );
-                            this.disconnect_member(
-                                &member_id,
-                                CloseReason::InternalError,
-                                Some(OnLeaveReason::Kicked),
-                                ctx,
-                            );
-                        }
-                    },
-                ),
+                self.init_member_connections(&member)
+                    .map_err(move |err, this, ctx| {
+                        error!(
+                            "Failed to interconnect Members, because {}",
+                            err,
+                        );
+                        this.disconnect_member(
+                            &member_id,
+                            CloseReason::InternalError,
+                            Some(OnLeaveReason::Kicked),
+                            ctx,
+                        );
+                    })
+                    .map(|_, _, _| ()),
             );
         }
 

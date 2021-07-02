@@ -35,9 +35,6 @@ pub trait CallbackClient: fmt::Debug + Send + Sync {
     async fn send(&self, request: CallbackRequest) -> CallbackResult;
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockCallbackClient);
-
 /// Factory for a [`CallbackClient`]s.
 #[cfg_attr(test, mockall::automock)]
 pub trait CallbackClientFactory {
@@ -46,9 +43,6 @@ pub trait CallbackClientFactory {
         url: CallbackUrl,
     ) -> LocalBoxFuture<'static, CallbackResult<Arc<dyn CallbackClient>>>;
 }
-
-#[cfg(test)]
-impl_debug_by_struct_name!(MockCallbackClientFactory);
 
 /// Implementation of the [`CallbackClientFactory`].
 #[derive(Clone, Debug, Default)]

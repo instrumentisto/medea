@@ -15,6 +15,7 @@ use std::{
 use actix::{Addr, Recipient};
 use actix_cors::Cors;
 use actix_web::{
+    error::{Error as HttpError, ErrorInternalServerError as InternalError},
     middleware,
     web::{self, Data, Json, Path},
     App, HttpResponse, HttpServer,
@@ -65,22 +66,24 @@ pub struct AppContext {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 pub async fn run(
     args: &ArgMatches<'static>,
-    callback_server_addr: Addr<GrpcCallbackServer>,
+    callback_server: Addr<GrpcCallbackServer>,
 ) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
     let subscribers = Arc::new(Mutex::new(HashMap::new()));
     let client = ControlClient::new(medea_addr, Arc::clone(&subscribers))
         .await
         .unwrap();
+    let app_data = Data::new(AppContext {
+        client,
+        subscribers,
+        callback_server,
+    });
+
     HttpServer::new(move || {
         debug!("Running HTTP server...");
         App::new()
             .wrap(Cors::permissive())
-            .data(AppContext {
-                client: client.clone(),
-                subscribers: Arc::clone(&subscribers),
-                callback_server: callback_server_addr.clone(),
-            })
+            .app_data(app_data.clone())
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/subscribe/{id}")
@@ -136,12 +139,17 @@ macro_rules! gen_request_macro {
                 pub async fn $name(
                     path: Path<$uri_tuple>,
                     state: Data<AppContext>,
-                ) -> Result<HttpResponse, ()> {
+                ) -> Result<HttpResponse, actix_web::Error> {
                     state
                         .client
                         .$call_fn(path.into_inner().into())
                         .await
-                        .map_err(|e| error!("{:?}", e))
+                        .map_err(|e| {
+                            actix_web::error::ErrorInternalServerError(format!(
+                                "{:?}",
+                                e
+                            ))
+                        })
                         .map(|r| <$resp>::from(r).into())
                 }
             };
@@ -158,12 +166,14 @@ macro_rules! gen_request_macro {
 #[allow(clippy::missing_panics_doc, clippy::needless_pass_by_value)]
 pub async fn get_callbacks(
     state: Data<AppContext>,
-) -> Result<HttpResponse, ()> {
+) -> Result<HttpResponse, HttpError> {
     state
         .callback_server
         .send(GetCallbackItems)
         .await
-        .map_err(|e| warn!("GrpcCallbackServer mailbox error. {:?}", e))
+        .map_err(|e| {
+            InternalError(format!("GrpcCallbackServer mailbox error. {:?}", e))
+        })
         .map(|callbacks| HttpResponse::Ok().json(&callbacks.unwrap()))
 }
 
@@ -172,7 +182,7 @@ pub async fn get_callbacks(
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod delete {
-    use super::{error, AppContext, Data, HttpResponse, Path, Response};
+    use super::{AppContext, Data, HttpResponse, Path, Response};
 
     gen_request_macro!(delete, Response);
 
@@ -186,9 +196,7 @@ mod delete {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod get {
-    use super::{
-        error, AppContext, Data, HttpResponse, Path, SingleGetResponse,
-    };
+    use super::{AppContext, Data, HttpResponse, Path, SingleGetResponse};
 
     gen_request_macro!(get, SingleGetResponse);
 
@@ -203,20 +211,20 @@ mod get {
 #[allow(clippy::needless_pass_by_value)]
 mod create {
     use super::{
-        error, AppContext, CreateResponse, Data, Element, Fid, HttpResponse,
-        Json, Path,
+        AppContext, CreateResponse, Data, Element, Fid, HttpError,
+        HttpResponse, InternalError, Json, Path,
     };
 
     pub async fn create1(
         path: Path<String>,
         state: Data<AppContext>,
         data: Json<Element>,
-    ) -> Result<HttpResponse, ()> {
+    ) -> Result<HttpResponse, HttpError> {
         state
             .client
             .create(path.into_inner(), Fid::from(()), data.0)
             .await
-            .map_err(|e| error!("{:?}", e))
+            .map_err(|e| InternalError(format!("{:?}", e)))
             .map(|r| CreateResponse::from(r).into())
     }
 
@@ -224,13 +232,13 @@ mod create {
         path: Path<(String, String)>,
         state: Data<AppContext>,
         data: Json<Element>,
-    ) -> Result<HttpResponse, ()> {
+    ) -> Result<HttpResponse, HttpError> {
         let uri = path.into_inner();
         state
             .client
             .create(uri.1, Fid::from(uri.0), data.0)
             .await
-            .map_err(|e| error!("{:?}", e))
+            .map_err(|e| InternalError(format!("{:?}", e)))
             .map(|r| CreateResponse::from(r).into())
     }
 
@@ -238,13 +246,13 @@ mod create {
         path: Path<(String, String, String)>,
         state: Data<AppContext>,
         data: Json<Element>,
-    ) -> Result<HttpResponse, ()> {
+    ) -> Result<HttpResponse, HttpError> {
         let uri = path.into_inner();
         state
             .client
             .create(uri.2, Fid::from((uri.0, uri.1)), data.0)
             .await
-            .map_err(|e| error!("{:?}", e))
+            .map_err(|e| InternalError(format!("{:?}", e)))
             .map(|r| CreateResponse::from(r).into())
     }
 }
@@ -254,20 +262,20 @@ mod create {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 mod apply {
     use super::{
-        error, AppContext, CreateResponse, Data, Element, Fid, HttpResponse,
-        Json, Path,
+        AppContext, CreateResponse, Data, Element, Fid, HttpError,
+        HttpResponse, InternalError, Json, Path,
     };
 
     pub async fn apply1(
         path: Path<String>,
         state: Data<AppContext>,
         data: Json<Element>,
-    ) -> Result<HttpResponse, ()> {
+    ) -> Result<HttpResponse, HttpError> {
         state
             .client
             .apply(path.clone(), Fid::from(path.into_inner()), data.0)
             .await
-            .map_err(|e| error!("{:?}", e))
+            .map_err(|e| InternalError(format!("{:?}", e)))
             .map(|r| CreateResponse::from(r).into())
     }
 
@@ -275,13 +283,13 @@ mod apply {
         path: Path<(String, String)>,
         state: Data<AppContext>,
         data: Json<Element>,
-    ) -> Result<HttpResponse, ()> {
+    ) -> Result<HttpResponse, HttpError> {
         let uri = path.into_inner();
         state
             .client
             .apply(uri.1.clone(), Fid::from((uri.0, uri.1)), data.0)
             .await
-            .map_err(|e| error!("{:?}", e))
+            .map_err(|e| InternalError(format!("{:?}", e)))
             .map(|r| CreateResponse::from(r).into())
     }
 }

@@ -75,38 +75,6 @@ macro_rules! hashset {
     };
 }
 
-/// Generates [`Debug`] implementation for a provided structure with name of
-/// this structure.
-///
-/// In debug print of this structure will be printed just a name of the provided
-/// structure.
-///
-/// # Example
-///
-/// ```
-/// # use medea::impl_debug_by_struct_name;
-/// struct Foo;
-///
-/// impl_debug_by_struct_name!(Foo);
-///
-/// assert_eq!(format!("{:?}", Foo), "Foo")
-/// ```
-///
-/// [`Debug`]: std::fmt::Debug
-#[macro_export]
-macro_rules! impl_debug_by_struct_name {
-    ($mock:ty) => {
-        impl ::std::fmt::Debug for $mock {
-            fn fmt(
-                &self,
-                f: &mut ::std::fmt::Formatter<'_>,
-            ) -> ::std::result::Result<(), ::std::fmt::Error> {
-                f.debug_struct(stringify!($mock)).finish()
-            }
-        }
-    };
-}
-
 /// `?` analog but for the functions which will return boxed [`ActorFuture`].
 ///
 /// [`ActorFuture`]: actix::ActorFuture

@@ -53,9 +53,6 @@ pub trait PeerConnectionStateEventsHandler: Send + Debug {
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>);
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockPeerConnectionStateEventsHandler);
-
 /// Builds [`PeerTrafficWatcher`].
 #[cfg(test)]
 pub fn build_peers_traffic_watcher(
@@ -151,9 +148,6 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     /// stopped.
     fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant);
 }
-
-#[cfg(test)]
-impl_debug_by_struct_name!(MockPeerTrafficWatcher);
 
 /// Returns [`FlowMetricSource`]s, which will be used to emit `Peer` state
 /// events.
