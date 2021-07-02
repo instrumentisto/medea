@@ -75,6 +75,3 @@ pub trait RpcServer: Debug + Send {
     /// [`Member`]: crate::signalling::elements::Member
     fn synchronize(&self, member_id: MemberId) -> LocalBoxFuture<'static, ()>;
 }
-
-#[cfg(test)]
-impl_debug_by_struct_name!(MockRpcServer);

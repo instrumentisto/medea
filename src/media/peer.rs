@@ -87,9 +87,6 @@ pub trait PeerUpdatesSubscriber: fmt::Debug {
     fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>);
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockPeerUpdatesSubscriber);
-
 /// [`Peer`] doesn't have remote [SDP] and is waiting for local [SDP].
 ///
 /// [SDP]: https://tools.ietf.org/html/rfc4317

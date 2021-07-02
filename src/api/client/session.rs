@@ -44,9 +44,6 @@ pub trait RpcServerRepository: Debug {
     fn get(&self, room_id: &RoomId) -> Option<Box<dyn RpcServer>>;
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockRpcServerRepository);
-
 /// Used to generate [`WsSession`] IDs.
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 

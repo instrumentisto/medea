@@ -66,9 +66,6 @@ pub trait RpcConnection: fmt::Debug + Send {
     fn send_event(&self, room_id: RoomId, event: Event);
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockRpcConnection);
-
 /// Settings of [`RpcConnection`].
 #[derive(Clone, Copy, Debug)]
 pub struct RpcConnectionSettings {

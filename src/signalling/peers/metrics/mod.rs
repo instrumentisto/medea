@@ -133,9 +133,6 @@ pub trait RtcStatsHandler: Debug {
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
 }
 
-#[cfg(test)]
-impl_debug_by_struct_name!(MockRtcStatsHandler);
-
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 ///
 /// [`Peer`]: crate::media::peer::Peer
