@@ -56,7 +56,7 @@ pub struct PeersService {
     /// this [`PeerRepository`] will be created with.
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    /// [`IceUser`]: crate::turn::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::IceUser
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -449,7 +449,7 @@ impl PeersService {
     ///
     /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
     ///
-    /// [`IceUser`]: crate::turn::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::IceUser
     pub async fn connect_endpoints(
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
