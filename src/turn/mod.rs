@@ -2,7 +2,7 @@
 //!
 //! [TURN]: https://webrtcglossary.com/turn
 
-mod constant;
+mod static_service;
 mod coturn;
 pub mod ice_user;
 
