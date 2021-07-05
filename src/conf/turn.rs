@@ -43,8 +43,8 @@ pub struct Turn {
 
     /// Mode of [TURN]/[STUN] server.
     ///
-    /// If `true` then some static [TURN]/[STUN] server will be used and
-    /// [Coturn] is not required.
+    /// If `true` then static [TURN]/[STUN] servers will be used and [Coturn]
+    /// is not required.
     ///
     /// Otherwise, [Coturn] is strictly required.
     ///

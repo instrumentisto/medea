@@ -61,9 +61,8 @@ impl StaticIceUser {
 impl StaticIceUser {
     /// Returns [`IceServer`] of this [`StaticIceUser`].
     pub fn ice_server(&self) -> IceServer {
-        let stun_url = vec![format!("{}:{}", self.kind, self.address)];
         IceServer {
-            urls: stun_url,
+            urls: vec![format!("{}:{}", self.kind, self.address)],
             username: self.username.clone(),
             credential: self.pass.clone(),
         }

@@ -811,7 +811,7 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
+    /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`]s.
     #[inline]
     pub fn ice_servers_list(&self) -> Vec<IceServer> {
         self.context
@@ -821,7 +821,8 @@ impl<T> Peer<T> {
             .collect()
     }
 
-    /// Sets [`IceUser`], which is used to generate [`IceServer`]s
+    /// Adds [`IceUser`]s, which is used to generate [`IceServer`]s of this
+    /// [`Peer`].
     #[inline]
     pub fn add_ice_users(&mut self, mut ice_users: Vec<IceUser>) {
         self.context.ice_users.append(&mut ice_users);
