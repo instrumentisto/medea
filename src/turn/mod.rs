@@ -19,7 +19,7 @@ use crate::conf;
 use self::coturn::{CoturnCliError, TurnDatabaseErr};
 
 #[doc(inline)]
-pub use self::ice_user::{IceUser, IceUsername};
+pub use self::ice_user::{IceUser};
 
 #[cfg(test)]
 pub use self::service::test::new_turn_auth_service_mock;

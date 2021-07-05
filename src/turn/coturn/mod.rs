@@ -7,6 +7,7 @@ mod allocation_event;
 mod cli;
 mod coturn_metrics;
 mod repo;
+mod ice_user;
 
 use std::slice;
 
@@ -20,13 +21,17 @@ use tokio::task::JoinHandle;
 use crate::{conf, log::prelude as log, utils::MpscOneshotSender};
 
 use super::{
-    ice_user::{IcePassword, IceUsername},
-    IceUser, TurnAuthService, TurnServiceErr, UnreachablePolicy,
+    TurnAuthService, TurnServiceErr, UnreachablePolicy,
 };
+use super::IceUser;
 
+use self::{
+    ice_user::{IcePassword, IceUsername},
+};
 use self::{cli::CoturnTelnetClient, repo::TurnDatabase};
 
 pub use self::{cli::CoturnCliError, repo::TurnDatabaseErr};
+pub use self::ice_user::CoturnIceUser;
 
 /// Username of Coturn user.
 #[derive(Clone, Debug, Display, Eq, Hash, PartialEq)]
@@ -131,8 +136,8 @@ impl Service {
     }
 
     /// Returns [`IceUser`] with static credentials.
-    fn static_user(&self) -> IceUser {
-        IceUser::new_static(
+    fn static_user(&self) -> CoturnIceUser {
+        CoturnIceUser::new_static(
             self.turn_address.clone(),
             self.turn_username.clone(),
             self.turn_password.clone(),
@@ -152,7 +157,7 @@ impl TurnAuthService for Service {
         peer_id: PeerId,
         policy: UnreachablePolicy,
     ) -> Result<IceUser, TurnServiceErr> {
-        let ice_user = IceUser::new_non_static(
+        let ice_user = CoturnIceUser::new_non_static(
             self.turn_address.clone(),
             &room_id,
             peer_id,
@@ -161,10 +166,10 @@ impl TurnAuthService for Service {
         );
 
         match self.turn_db.insert(&ice_user).await {
-            Ok(_) => Ok(ice_user),
+            Ok(_) => Ok(ice_user.into()),
             Err(err) => match policy {
                 UnreachablePolicy::ReturnErr => Err(err.into()),
-                UnreachablePolicy::ReturnStatic => Ok(self.static_user()),
+                UnreachablePolicy::ReturnStatic => Ok(self.static_user().into()),
             },
         }
     }

@@ -12,7 +12,10 @@ use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{
     log::prelude as log,
-    turn::{IceUser, IceUsername},
+};
+
+use super::ice_user::{
+    CoturnIceUser, IceUsername,
 };
 
 /// Medea's [Coturn] realm name.
@@ -63,7 +66,7 @@ impl TurnDatabase {
     ///
     /// Errors if unable to establish connection with database, or database
     /// request fails.
-    pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
+    pub async fn insert(&self, user: &CoturnIceUser) -> Result<(), TurnDatabaseErr> {
         log::debug!("Store ICE user: {:?}", user);
 
         let key = user.user().redis_key();
@@ -110,7 +113,7 @@ impl IceUsername {
     }
 }
 
-impl IceUser {
+impl CoturnIceUser {
     /// Forms a [Coturn]'s [HMAC key] of this [`IceUser`].
     ///
     /// [HMAC key]: https://tinyurl.com/y33qa86c
