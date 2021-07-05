@@ -55,9 +55,7 @@ impl CommandHandler for Room {
 
         let from_member_id = from_peer.member_id();
         let to_member_id = to_peer.member_id();
-        let ice_servers = to_peer.ice_servers_list().ok_or_else(|| {
-            RoomError::NoTurnCredentials(to_member_id.clone())
-        })?;
+        let ice_servers = to_peer.ice_servers_list();
 
         let event = if from_peer.is_known_to_remote() {
             Event::PeerUpdated {

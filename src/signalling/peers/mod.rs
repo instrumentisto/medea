@@ -528,13 +528,13 @@ impl PeersService {
         peer_id: PeerId,
         endpoint: &Endpoint,
     ) -> Result<(), RoomError> {
-        let ice_user = self
+        let ice_users = self
             .turn_service
             .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
             .await?;
 
         self.peers.map_peer_by_id_mut(peer_id, move |p| {
-            p.set_ice_user(ice_user);
+            p.add_ice_users(ice_users);
             p.set_initialized();
         })?;
 

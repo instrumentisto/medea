@@ -59,7 +59,7 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
         room_id: RoomId,
         peer_id: PeerId,
         policy: UnreachablePolicy,
-    ) -> Result<IceUser, TurnServiceErr>;
+    ) -> Result<Vec<IceUser>, TurnServiceErr>;
 }
 
 /// Create new instance [`TurnAuthService`].
@@ -92,12 +92,12 @@ pub mod test {
             _: RoomId,
             _: PeerId,
             _: UnreachablePolicy,
-        ) -> Result<IceUser, TurnServiceErr> {
-            Ok(IceUser::new_static(
+        ) -> Result<Vec<IceUser>, TurnServiceErr> {
+            Ok(vec![IceUser::new_static(
                 "5.5.5.5:1234".parse().unwrap(),
                 "username".into(),
                 "password".into(),
-            ))
+            )])
         }
     }
 

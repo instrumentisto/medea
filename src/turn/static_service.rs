@@ -23,7 +23,7 @@ pub struct StaticService {
 
 #[async_trait]
 impl TurnAuthService for StaticService {
-    async fn create(&self, room_id: RoomId, peer_id: PeerId, policy: UnreachablePolicy) -> Result<IceUser, TurnServiceErr> {
+    async fn create(&self, room_id: RoomId, peer_id: PeerId, policy: UnreachablePolicy) -> Result<Vec<IceUser>, TurnServiceErr> {
         todo!()
     }
 }

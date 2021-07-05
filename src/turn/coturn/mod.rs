@@ -156,7 +156,7 @@ impl TurnAuthService for Service {
         room_id: RoomId,
         peer_id: PeerId,
         policy: UnreachablePolicy,
-    ) -> Result<IceUser, TurnServiceErr> {
+    ) -> Result<Vec<IceUser>, TurnServiceErr> {
         let ice_user = CoturnIceUser::new_non_static(
             self.turn_address.clone(),
             &room_id,
@@ -166,10 +166,10 @@ impl TurnAuthService for Service {
         );
 
         match self.turn_db.insert(&ice_user).await {
-            Ok(_) => Ok(ice_user.into()),
+            Ok(_) => Ok(vec![ice_user.into()]),
             Err(err) => match policy {
                 UnreachablePolicy::ReturnErr => Err(err.into()),
-                UnreachablePolicy::ReturnStatic => Ok(self.static_user().into()),
+                UnreachablePolicy::ReturnStatic => Ok(vec![self.static_user().into()]),
             },
         }
     }

@@ -172,8 +172,8 @@ impl PeerError {
 #[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
-#[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
+#[enum_delegate(pub fn ice_servers_list(&self) -> Vec<IceServer>)]
+#[enum_delegate(pub fn add_ice_users(&mut self, ice_users: Vec<IceUser>))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
@@ -263,7 +263,7 @@ impl PeerStateMachine {
             senders: self.get_senders_states(),
             receivers: self.get_receivers_states(),
             force_relay: self.is_force_relayed(),
-            ice_servers: self.ice_servers_list().unwrap(),
+            ice_servers: self.ice_servers_list(),
             negotiation_role: self.negotiation_role(),
             local_sdp: self.local_sdp().map(ToOwned::to_owned),
             remote_sdp: self.remote_sdp().map(ToOwned::to_owned),
@@ -416,7 +416,7 @@ pub struct Context {
     partner_member: MemberId,
 
     /// [`IceUser`] created for this [`Peer`].
-    ice_user: Option<IceUser>,
+    ice_users: Vec<IceUser>,
 
     /// [SDP] offer of this [`Peer`].
     ///
@@ -813,14 +813,14 @@ impl<T> Peer<T> {
 
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
     #[inline]
-    pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
-        self.context.ice_user.as_ref().map(IceUser::servers_list)
+    pub fn ice_servers_list(&self) -> Vec<IceServer> {
+        self.context.ice_users.iter().flat_map(IceUser::servers_list).collect()
     }
 
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s
     #[inline]
-    pub fn set_ice_user(&mut self, ice_user: IceUser) {
-        self.context.ice_user.replace(ice_user);
+    pub fn add_ice_users(&mut self, mut ice_users: Vec<IceUser>) {
+        self.context.ice_users.append(&mut ice_users);
     }
 
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
@@ -1185,7 +1185,7 @@ impl Peer<Stable> {
             member_id,
             partner_peer,
             partner_member,
-            ice_user: None,
+            ice_users: Vec::new(),
             local_sdp: None,
             remote_sdp: None,
             receivers: HashMap::new(),

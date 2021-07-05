@@ -37,14 +37,7 @@ impl Room {
                 }
             };
 
-        let ice_servers = if let Some(ice_servers) = peer.ice_servers_list() {
-            ice_servers
-        } else {
-            let member_id = peer.member_id().clone();
-            self.peers.add_peer(peer);
-            self.peers.add_peer(partner_peer);
-            return Err(RoomError::NoTurnCredentials(member_id));
-        };
+        let ice_servers = peer.ice_servers_list();
 
         let peer = peer.start_as_offerer();
         let partner_peer = partner_peer.start_as_answerer();
