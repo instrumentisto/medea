@@ -103,6 +103,51 @@
 # Default:
 #   pass = "PASS"
 
+# Mode of TURN/STUN server.
+#
+# If true then static TURN/STUN server will be used and Coturn
+# is not required.
+#
+# Otherwise, Coturn is strictly required.
+#
+# Env var: MEDEA_TURN__IS_STATIC
+# Default:
+#   is_static = false
+
+
+# List of static TURN servers credentials.
+#
+# [[turn.static.turn]]
+
+# Host of TURN server.
+#
+# address = "localhost:3478"
+
+# Username for authorization.
+#
+# username = "USER"
+
+# Password for authorization.
+#
+# pass = "PASS"
+
+
+# List of static STUN servers credentials.
+#
+# [[turn.static.stun]]
+
+# Host of STUN server.
+#
+# address = "stun.l.google.com:19302"
+
+# Username for authorization.
+#
+# username = "USER"
+
+# Password for authorization.
+#
+# pass = "PASS"
+
 
 [turn.db.redis]
 # Host of Coturn's Redis database server.

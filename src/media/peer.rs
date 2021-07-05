@@ -1596,11 +1596,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
@@ -1634,11 +1634,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
 
         let mut peer = peer.start_as_offerer();
@@ -1684,11 +1684,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1787,11 +1787,11 @@ pub mod tests {
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
         let mut peer = PeerStateMachine::from(peer);
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
@@ -2084,11 +2084,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
             peer.context.peer_changes_queue = changes;
             peer.commit_scheduled_changes();
@@ -2129,11 +2129,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
 
             peer.context.peer_changes_queue = changes.clone();
@@ -2174,11 +2174,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
 
             peer.context.peer_changes_queue = changes.clone();
@@ -2211,11 +2211,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
 
             peer

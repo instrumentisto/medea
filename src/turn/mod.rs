@@ -3,7 +3,7 @@
 //! [TURN]: https://webrtcglossary.com/turn
 
 mod coturn;
-pub mod ice_user;
+mod ice_user;
 mod static_service;
 
 use std::sync::Arc;
@@ -14,16 +14,15 @@ use derive_more::{Display, From};
 use failure::Fail;
 use medea_client_api_proto::{PeerId, RoomId};
 
-use crate::conf;
+use crate::{conf, turn::static_service::StaticService};
 
-use self::coturn::{CoturnCliError, TurnDatabaseErr};
+use self::coturn::{CoturnCliError, Service as CoturnService, TurnDatabaseErr};
 
 #[doc(inline)]
 pub use self::ice_user::IceUser;
 
 #[cfg(test)]
-pub use self::service::test::new_turn_auth_service_mock;
-use crate::turn::static_service::StaticService;
+pub use self::test::new_turn_auth_service_mock;
 
 /// Error which can happen in [`TurnAuthService`].
 #[derive(Display, Debug, Fail, From)]
@@ -75,7 +74,7 @@ pub fn new_turn_auth_service<'a>(
     if cf.is_static {
         Ok(Arc::new(StaticService::new(&cf.r#static)))
     } else {
-        Ok(Arc::new(coturn::Service::new(cf)?))
+        Ok(Arc::new(CoturnService::new(cf)?))
     }
 }
 
@@ -98,7 +97,7 @@ pub mod test {
             _: PeerId,
             _: UnreachablePolicy,
         ) -> Result<Vec<IceUser>, TurnServiceErr> {
-            Ok(vec![IceUser::new_static(
+            Ok(vec![IceUser::new_coturn_static(
                 "5.5.5.5:1234".parse().unwrap(),
                 "username".into(),
                 "password".into(),

@@ -56,6 +56,7 @@ impl CoturnMetricsService {
     /// # Errors
     ///
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
+    #[allow(dead_code)]
     pub fn new(
         cf: &crate::conf::turn::Turn,
         peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,

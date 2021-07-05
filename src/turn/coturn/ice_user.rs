@@ -47,7 +47,9 @@ impl IcePassword {
     }
 }
 
-/// Credentials on Turn server.
+/// Credentials on [Coturn] server.
+///
+/// [Coturn]: https://github.com/coturn/coturn
 #[derive(Debug)]
 pub struct CoturnIceUser {
     /// Address of Turn server.

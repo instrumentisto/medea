@@ -43,7 +43,11 @@ pub struct CoturnUsername {
     pub peer_id: PeerId,
 }
 
-/// [`TurnAuthService`] implementation backed by Redis database.
+/// [`TurnAuthService`] implementation backed by [Coturn] [TURN]/[STUN] server.
+///
+/// [Coturn]: https://github.com/coturn/coturn
+/// [STUN]: https://webrtcglossary.com/stun/
+/// [TURN]: https://webrtcglossary.com/turn/
 #[derive(Debug)]
 pub struct Service {
     /// Turn credentials repository.

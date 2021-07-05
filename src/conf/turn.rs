@@ -41,8 +41,25 @@ pub struct Turn {
     /// Admin interface settings.
     pub cli: CoturnCli,
 
+    /// Mode of [TURN]/[STUN] server.
+    ///
+    /// If `true` then some static [TURN]/[STUN] server will be used and
+    /// [Coturn] is not required.
+    ///
+    /// Otherwise, [Coturn] is strictly required.
+    ///
+    /// Defaults to `false`.
+    ///
+    /// [STUN]: https://webrtcglossary.com/stun/
+    /// [TURN]: https://webrtcglossary.com/turn/
+    /// [Coturn]: https://github.com/coturn/coturn
+    #[default = false]
     pub is_static: bool,
 
+    /// Static [TURN]/[STUN] servers configuration.
+    ///
+    /// [STUN]: https://webrtcglossary.com/stun/
+    /// [TURN]: https://webrtcglossary.com/turn/
     pub r#static: Static,
 }
 
@@ -204,19 +221,42 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
     }
 }
 
+/// Static [TURN]/[STUN] servers configuration.
+///
+/// [STUN]: https://webrtcglossary.com/stun/
+/// [TURN]: https://webrtcglossary.com/turn/
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Static {
+    /// List of static [STUN] servers credentials.
+    ///
+    /// [STUN]: https://webrtcglossary.com/stun/
     #[serde(rename = "stun")]
     pub stuns: Vec<StaticCredentials>,
-    #[serde(rename = "stun")]
+
+    /// List of static [TURN] servers credentials.
+    ///
+    /// [TURN]: https://webrtcglossary.com/turn/
+    #[serde(rename = "turn")]
     pub turns: Vec<StaticCredentials>,
 }
 
+/// Static [TURN]/[STUN] server credentials.
+///
+/// [TURN]: https://webrtcglossary.com/turn/
+/// [STUN]: https://webrtcglossary.com/stun/
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StaticCredentials {
+    /// Address of [TURN]/[STUN] server.
+    ///
+    /// [TURN]: https://webrtcglossary.com/turn/
+    /// [STUN]: https://webrtcglossary.com/stun/
     pub address: String,
+
+    /// Username for authorization.
     pub username: Option<String>,
+
+    /// Password for authorization.
     pub pass: Option<String>,
 }
 

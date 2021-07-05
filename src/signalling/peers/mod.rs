@@ -946,7 +946,7 @@ mod tests {
         signalling::{
             elements::Member, peers::traffic_watcher::MockPeerTrafficWatcher,
         },
-        turn::service::test::new_turn_auth_service_mock,
+        turn::test::new_turn_auth_service_mock,
     };
 
     use super::{metrics::MockRtcStatsHandler, *};
