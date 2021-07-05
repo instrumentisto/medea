@@ -7,12 +7,15 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, DartFuture, DartResult, FormatException,
-            InternalException, IntoDartFuture as _, StateError,
+            InternalException, IntoDartFuture as _, StateError, MediaStateTransitionException
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
-    peer::LocalMediaError,
+    peer::{
+        media::sender::CreateError, InsertLocalTracksError,
+        UpdateLocalStreamError, LocalMediaError
+    },
     platform,
     room::{
         ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -26,13 +29,6 @@ use super::{utils::DartError, MediaStreamSettings};
 pub use self::mock::RoomHandle;
 #[cfg(not(feature = "mockable"))]
 pub use crate::room::RoomHandle;
-use crate::{
-    api::dart::utils::MediaStateTransitionException,
-    peer::{
-        media::sender::CreateError, InsertLocalTracksError,
-        UpdateLocalStreamError,
-    },
-};
 
 impl ForeignClass for RoomHandle {}
 
