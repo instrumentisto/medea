@@ -814,7 +814,11 @@ impl<T> Peer<T> {
     /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
     #[inline]
     pub fn ice_servers_list(&self) -> Vec<IceServer> {
-        self.context.ice_users.iter().flat_map(IceUser::servers_list).collect()
+        self.context
+            .ice_users
+            .iter()
+            .flat_map(IceUser::servers_list)
+            .collect()
     }
 
     /// Sets [`IceUser`], which is used to generate [`IceServer`]s

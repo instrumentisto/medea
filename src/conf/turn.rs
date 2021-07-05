@@ -40,6 +40,10 @@ pub struct Turn {
 
     /// Admin interface settings.
     pub cli: CoturnCli,
+
+    pub is_static: bool,
+
+    pub r#static: Static,
 }
 
 impl Turn {
@@ -198,6 +202,22 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
             runtime: Runtime::Tokio1,
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct Static {
+    #[serde(rename = "stun")]
+    pub stuns: Vec<StaticCredentials>,
+    #[serde(rename = "stun")]
+    pub turns: Vec<StaticCredentials>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct StaticCredentials {
+    pub address: String,
+    pub username: Option<String>,
+    pub pass: Option<String>,
 }
 
 #[cfg(test)]

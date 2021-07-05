@@ -2,9 +2,9 @@
 //!
 //! [TURN]: https://webrtcglossary.com/turn
 
-mod static_service;
 mod coturn;
 pub mod ice_user;
+mod static_service;
 
 use std::sync::Arc;
 
@@ -19,10 +19,11 @@ use crate::conf;
 use self::coturn::{CoturnCliError, TurnDatabaseErr};
 
 #[doc(inline)]
-pub use self::ice_user::{IceUser};
+pub use self::ice_user::IceUser;
 
 #[cfg(test)]
 pub use self::service::test::new_turn_auth_service_mock;
+use crate::turn::static_service::StaticService;
 
 /// Error which can happen in [`TurnAuthService`].
 #[derive(Display, Debug, Fail, From)]
@@ -71,7 +72,11 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
-    Ok(Arc::new(coturn::Service::new(cf)?))
+    if cf.is_static {
+        Ok(Arc::new(StaticService::new(&cf.r#static)))
+    } else {
+        Ok(Arc::new(coturn::Service::new(cf)?))
+    }
 }
 
 #[cfg(test)]

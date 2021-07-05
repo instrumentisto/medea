@@ -6,8 +6,8 @@
 mod allocation_event;
 mod cli;
 mod coturn_metrics;
-mod repo;
 mod ice_user;
+mod repo;
 
 use std::slice;
 
@@ -20,18 +20,17 @@ use tokio::task::JoinHandle;
 
 use crate::{conf, log::prelude as log, utils::MpscOneshotSender};
 
-use super::{
-    TurnAuthService, TurnServiceErr, UnreachablePolicy,
-};
-use super::IceUser;
+use super::{IceUser, TurnAuthService, TurnServiceErr, UnreachablePolicy};
 
 use self::{
+    cli::CoturnTelnetClient,
     ice_user::{IcePassword, IceUsername},
+    repo::TurnDatabase,
 };
-use self::{cli::CoturnTelnetClient, repo::TurnDatabase};
 
-pub use self::{cli::CoturnCliError, repo::TurnDatabaseErr};
-pub use self::ice_user::CoturnIceUser;
+pub use self::{
+    cli::CoturnCliError, ice_user::CoturnIceUser, repo::TurnDatabaseErr,
+};
 
 /// Username of Coturn user.
 #[derive(Clone, Debug, Display, Eq, Hash, PartialEq)]
@@ -169,7 +168,9 @@ impl TurnAuthService for Service {
             Ok(_) => Ok(vec![ice_user.into()]),
             Err(err) => match policy {
                 UnreachablePolicy::ReturnErr => Err(err.into()),
-                UnreachablePolicy::ReturnStatic => Ok(vec![self.static_user().into()]),
+                UnreachablePolicy::ReturnStatic => {
+                    Ok(vec![self.static_user().into()])
+                }
             },
         }
     }
