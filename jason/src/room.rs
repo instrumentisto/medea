@@ -20,7 +20,6 @@ use tracerr::Traced;
 
 use crate::{
     api,
-    api::JasonError,
     connection::Connections,
     media::{
         track::{local, remote},
@@ -29,9 +28,9 @@ use crate::{
     },
     peer::{
         self, media::ProhibitedStateError, media_exchange_state, mute_state,
-        InsertLocalTracksError, LocalStreamUpdateCriteria, MediaState,
-        PeerConnection, PeerEvent, PeerEventHandler, TrackDirection,
-        TracksRequestError, UpdateLocalStreamError,
+        InsertLocalTracksError, LocalMediaError, LocalStreamUpdateCriteria,
+        MediaState, PeerConnection, PeerEvent, PeerEventHandler,
+        TrackDirection, TracksRequestError, UpdateLocalStreamError,
     },
     platform,
     rpc::{
@@ -317,7 +316,7 @@ impl RoomHandle {
     /// See [`HandleDetachedError`] for details.
     pub fn on_failed_local_media(
         &self,
-        f: platform::Function<api::JasonError>,
+        f: platform::Function<api::Error>,
     ) -> Result<(), Traced<HandleDetachedError>> {
         upgrade_inner!(self.0)
             .map(|inner| inner.on_failed_local_media.set_func(f))
@@ -958,7 +957,7 @@ struct InnerRoom {
 
     /// Callback invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_media: Rc<platform::Callback<api::JasonError>>,
+    on_failed_local_media: Rc<platform::Callback<api::Error>>,
 
     /// Callback invoked when a [`RpcSession`] loses connection.
     on_connection_loss: platform::Callback<api::ReconnectHandle>,
@@ -1313,13 +1312,12 @@ impl InnerRoom {
                 .media_manager
                 .get_tracks(req)
                 .await
-                .map_err(tracerr::map_from_and_wrap!())
                 .map_err(|e| {
-                    self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
+                    self.on_failed_local_media.call1(e.clone());
 
                     e
-                })?;
+                })
+                .map_err(tracerr::map_from_and_wrap!())?;
             for (track, is_new) in tracks {
                 if is_new {
                     self.on_local_track
@@ -1808,8 +1806,11 @@ impl PeerEventHandler for InnerRoom {
 
     /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
     /// `on_failed_local_media` [`Room`]'s callback.
-    async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
-        self.on_failed_local_media.call1(error);
+    async fn on_failed_local_media(
+        &self,
+        error: Traced<LocalMediaError>,
+    ) -> Self::Output {
+        self.on_failed_local_media.call1(api::Error::from(error));
         Ok(())
     }
 

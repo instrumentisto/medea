@@ -13,7 +13,6 @@ pub mod device_video_track_constraints;
 pub mod display_video_track_constraints;
 pub mod input_device_info;
 pub mod jason;
-pub mod jason_error;
 pub mod local_media_track;
 pub mod media_manager_handle;
 pub mod media_stream_settings;
@@ -21,7 +20,6 @@ pub mod reconnect_handle;
 pub mod remote_media_track;
 pub mod room_close_reason;
 pub mod room_handle;
-mod unimplemented;
 pub mod utils;
 
 use std::{convert::TryFrom, ffi::c_void, marker::PhantomData, ptr};
@@ -42,12 +40,13 @@ pub use self::{
     connection_handle::ConnectionHandle,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
-    input_device_info::InputDeviceInfo, jason::Jason, jason_error::JasonError,
+    input_device_info::InputDeviceInfo, jason::Jason,
     local_media_track::LocalMediaTrack,
     media_manager_handle::MediaManagerHandle,
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
+    utils::DartError as Error,
 };
 
 /// Rust structure having wrapper class in Dart.

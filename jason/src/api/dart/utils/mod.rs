@@ -16,7 +16,8 @@ pub use self::{
     arrays::PtrArray,
     err::{
         ArgumentError, DartError, EnumerateDevicesException, FormatException,
-        LocalMediaInitException, LocalMediaInitExceptionKind,
+        InternalException, LocalMediaInitException,
+        LocalMediaInitExceptionKind, MediaStateTransitionException,
         RpcClientException, RpcClientExceptionKind, StateError,
     },
     result::DartResult,

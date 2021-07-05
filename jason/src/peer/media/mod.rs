@@ -211,7 +211,7 @@ pub enum TrackDirection {
 }
 
 /// Error occurring when media state transition is not allowed.
-#[derive(Clone, Debug, Display, From)]
+#[derive(Clone, Debug, Display)]
 pub enum ProhibitedStateError {
     /// [`Sender`] cannot be disabled because it's required.
     #[display(fmt = "MediaExchangeState of Sender can't transit to \
@@ -232,7 +232,7 @@ pub enum InsertLocalTracksError {
     NotEnoughTracks,
 
     /// Insertion of a [`local::Track`] into a [`Sender`] fails.
-    CouldNotInsertLocalTrack(sender::InsertTrackError),
+    CouldNotInsertLocalTrack(#[js(cause)] sender::InsertTrackError),
 }
 
 /// Errors occurring in [`MediaConnections::get_mids()`] method.

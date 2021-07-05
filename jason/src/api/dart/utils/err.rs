@@ -5,13 +5,11 @@ use std::{borrow::Cow, ptr};
 use dart_sys::Dart_Handle;
 use derive_more::Into;
 use libc::c_char;
-use tracerr::{Trace, Traced};
+use tracerr::Trace;
 
 use crate::{
     api::dart::{utils::string_into_c_str, DartValue},
     platform,
-    rpc::SessionError,
-    utils::JsCaused as _,
 };
 
 /// Pointer to an extern function that returns a new Dart [`ArgumentError`] with
@@ -66,6 +64,22 @@ type NewRpcClientExceptionCaller = extern "C" fn(
     stacktrace: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
 
+/// Pointer to an extern function that returns a new Dart
+/// [`MediaStateTransitionException`] with the provided error `message` and
+/// `stacktrace`.
+type NewMediaStateTransitionExceptionCaller = extern "C" fn(
+    message: ptr::NonNull<c_char>,
+    stacktrace: ptr::NonNull<c_char>,
+) -> Dart_Handle;
+
+/// Pointer to an extern function that returns a new Dart [`InternalException`]
+/// with the provided error `message` `cause` and `stacktrace`.
+type NewInternalExceptionCaller = extern "C" fn(
+    message: ptr::NonNull<c_char>,
+    cause: DartValue,
+    stacktrace: ptr::NonNull<c_char>,
+) -> Dart_Handle;
+
 /// Stores pointer to the [`NewArgumentErrorCaller`] extern function.
 ///
 /// Must be initialized by Dart during FFI initialization phase.
@@ -102,6 +116,20 @@ static mut NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER: Option<
 static mut NEW_RPC_CLIENT_EXCEPTION_CALLER: Option<
     NewRpcClientExceptionCaller,
 > = None;
+
+/// Stores pointer to the [`NewMediaStateTransitionExceptionCaller`] extern
+/// function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER: Option<
+    NewMediaStateTransitionExceptionCaller,
+> = None;
+
+/// Stores pointer to the [`NewInternalExceptionCaller`] extern function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_INTERNAL_EXCEPTION_CALLER: Option<NewInternalExceptionCaller> =
+    None;
 
 /// Registers the provided [`NewArgumentErrorCaller`] as
 /// [`NEW_ARGUMENT_ERROR_CALLER`].
@@ -179,6 +207,32 @@ pub unsafe extern "C" fn register_new_rpc_client_exception_caller(
     f: NewRpcClientExceptionCaller,
 ) {
     NEW_RPC_CLIENT_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewMediaStateTransitionExceptionCaller`] as
+/// [`NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_media_state_transition_exception_caller(
+    f: NewMediaStateTransitionExceptionCaller,
+) {
+    NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewInternalExceptionCaller`] as
+/// [`NEW_INTERNAL_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_internal_exception_caller(
+    f: NewInternalExceptionCaller,
+) {
+    NEW_INTERNAL_EXCEPTION_CALLER = Some(f);
 }
 
 /// An error that can be returned from Rust to Dart.
@@ -420,11 +474,6 @@ pub enum RpcClientExceptionKind {
 
     /// RPC session has been finished. This is a terminal state.
     SessionFinished,
-
-    /// Internal error that is not meant to be handled by external users.
-    ///
-    /// This is a programmatic error.
-    InternalError,
 }
 
 /// Exceptions thrown from an RPC client that implements messaging with media
@@ -477,28 +526,85 @@ impl From<RpcClientException> for DartError {
     }
 }
 
-impl From<Traced<SessionError>> for RpcClientException {
-    fn from(err: Traced<SessionError>) -> Self {
-        use RpcClientExceptionKind as Kind;
-        use SessionError as SE;
+/// Exception thrown when the requested media state transition could not be
+/// performed.
+pub struct MediaStateTransitionException {
+    /// Error message describing the problem.
+    message: Cow<'static, str>,
 
-        let (err, trace) = err.into_parts();
-        let message = err.to_string();
+    /// Stacktrace of this [`MediaStateTransitionException`].
+    trace: Trace,
+}
 
-        let mut cause = None;
-        let kind = match err {
-            SE::SessionFinished(_) => Kind::SessionFinished,
-            SE::NoCredentials
-            | SE::SessionUnexpectedlyDropped
-            | SE::NewConnectionInfo => Kind::InternalError,
-            SE::RpcClient(err) => {
-                cause = err.js_cause();
-                Kind::InternalError
-            }
-            SE::AuthorizationFailed => Kind::AuthorizationFailed,
-            SE::ConnectionLost(_) => Kind::ConnectionLost,
-        };
+impl MediaStateTransitionException {
+    /// Creates a new [`MediaStateTransitionException`] from the provided error
+    /// `message` and `trace`.
+    #[inline]
+    #[must_use]
+    pub fn new<T: Into<Cow<'static, str>>>(message: T, trace: Trace) -> Self {
+        Self {
+            message: message.into(),
+            trace,
+        }
+    }
+}
 
-        RpcClientException::new(kind, message, cause, trace)
+impl From<MediaStateTransitionException> for DartError {
+    #[inline]
+    fn from(err: MediaStateTransitionException) -> Self {
+        unsafe {
+            Self::new(NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER.unwrap()(
+                string_into_c_str(err.message.into_owned()),
+                string_into_c_str(err.trace.to_string()),
+            ))
+        }
+    }
+}
+
+/// Jason's internal exception.
+///
+/// This is either a programmatic error or some unexpected platform component
+/// failure that cannot be handled in any way.
+///
+/// It can be converted into a [`DartError`] and passed to Dart.
+pub struct InternalException {
+    /// Error message describing the problem.
+    message: Cow<'static, str>,
+
+    /// [`platform::Error`] that caused this [`RpcClientException`].
+    cause: Option<platform::Error>,
+
+    /// Stacktrace of this [`InternalException`].
+    trace: Trace,
+}
+
+impl InternalException {
+    /// Creates a new [`InternalException`] from the provided error `message`,
+    /// `trace` and an optional `cause`.
+    #[inline]
+    #[must_use]
+    pub fn new<T: Into<Cow<'static, str>>>(
+        message: T,
+        cause: Option<platform::Error>,
+        trace: Trace,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            trace,
+            cause,
+        }
+    }
+}
+
+impl From<InternalException> for DartError {
+    #[inline]
+    fn from(err: InternalException) -> Self {
+        unsafe {
+            Self::new(NEW_INTERNAL_EXCEPTION_CALLER.unwrap()(
+                string_into_c_str(err.message.into_owned()),
+                err.cause.map(DartError::from).into(),
+                string_into_c_str(err.trace.to_string()),
+            ))
+        }
     }
 }

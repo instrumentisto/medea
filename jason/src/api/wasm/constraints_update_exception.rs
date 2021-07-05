@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::room;
 
-use super::JasonError;
+use super::Error;
 
 /// Exception returned from [`RoomHandle::set_local_media_settings()`][1].
 ///
@@ -29,7 +29,7 @@ impl ConstraintsUpdateException {
     /// a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn recover_reason(&self) -> Option<JasonError> {
+    pub fn recover_reason(&self) -> Option<Error> {
         self.0.recover_reason().map(Into::into)
     }
 
@@ -40,7 +40,7 @@ impl ConstraintsUpdateException {
         self.0
             .recover_fail_reasons()
             .into_iter()
-            .map(JasonError::from)
+            .map(Error::from)
             .map(JsValue::from)
             .collect::<js_sys::Array>()
             .into()
@@ -50,7 +50,7 @@ impl ConstraintsUpdateException {
     /// an `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn error(&self) -> Option<JasonError> {
+    pub fn error(&self) -> Option<Error> {
         self.0.error().map(Into::into)
     }
 }

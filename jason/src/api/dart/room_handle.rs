@@ -7,11 +7,12 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, DartFuture, DartResult, FormatException,
-            IntoDartFuture as _, RpcClientException, StateError,
+            InternalException, IntoDartFuture as _, StateError,
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
+    peer::LocalMediaError,
     platform,
     room::{
         ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -25,6 +26,13 @@ use super::{utils::DartError, MediaStreamSettings};
 pub use self::mock::RoomHandle;
 #[cfg(not(feature = "mockable"))]
 pub use crate::room::RoomHandle;
+use crate::{
+    api::dart::utils::MediaStateTransitionException,
+    peer::{
+        media::sender::CreateError, InsertLocalTracksError,
+        UpdateLocalStreamError,
+    },
+};
 
 impl ForeignClass for RoomHandle {}
 
@@ -49,7 +57,39 @@ impl From<Traced<RoomJoinError>> for DartError {
                 FormatException::new(message).into()
             }
             RoomJoinError::SessionError(err) => {
-                RpcClientException::from(Traced::from_parts(err, trace)).into()
+                Traced::from_parts(err, trace).into()
+            }
+        }
+    }
+}
+
+impl From<Traced<LocalMediaError>> for DartError {
+    fn from(err: Traced<LocalMediaError>) -> Self {
+        use InsertLocalTracksError as IE;
+        use LocalMediaError as ME;
+        use UpdateLocalStreamError as UE;
+
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        match err {
+            ME::UpdateLocalStreamError(err) => match err {
+                UE::CouldNotGetLocalMedia(err) => {
+                    Traced::from_parts(err, trace).into()
+                }
+                UE::InvalidLocalTracks(_)
+                | UE::InsertLocalTracksError(
+                    IE::InvalidMediaTrack | IE::NotEnoughTracks,
+                ) => MediaStateTransitionException::new(message, trace).into(),
+                UE::InsertLocalTracksError(IE::CouldNotInsertLocalTrack(_)) => {
+                    InternalException::new(message, None, trace).into()
+                }
+            },
+            ME::SenderCreateError(CreateError::TransceiverNotFound(_)) => {
+                InternalException::new(message, None, trace).into()
+            }
+            ME::SenderCreateError(CreateError::CannotDisableRequiredSender) => {
+                MediaStateTransitionException::new(message, trace).into()
             }
         }
     }
@@ -58,16 +98,23 @@ impl From<Traced<RoomJoinError>> for DartError {
 impl From<Traced<ChangeMediaStateError>> for DartError {
     #[inline]
     fn from(err: Traced<ChangeMediaStateError>) -> Self {
-        match err.into_inner() {
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        match err {
             ChangeMediaStateError::Detached => {
                 StateError::new("RoomHandle is in detached state.").into()
             }
-            ChangeMediaStateError::InvalidLocalTracks(_)
-            | ChangeMediaStateError::CouldNotGetLocalMedia(_)
-            | ChangeMediaStateError::InsertLocalTracksError(_)
-            | ChangeMediaStateError::ProhibitedState(_)
-            | ChangeMediaStateError::TransitionIntoOppositeState(_) => {
-                todo!()
+            ChangeMediaStateError::CouldNotGetLocalMedia(err) => {
+                Traced::from_parts(err, trace).into()
+            }
+            ChangeMediaStateError::ProhibitedState(_)
+            | ChangeMediaStateError::TransitionIntoOppositeState(_)
+            | ChangeMediaStateError::InvalidLocalTracks(_) => {
+                MediaStateTransitionException::new(message, trace).into()
+            }
+            ChangeMediaStateError::InsertLocalTracksError(_) => {
+                InternalException::new(message, None, trace).into()
             }
         }
     }
@@ -76,7 +123,20 @@ impl From<Traced<ChangeMediaStateError>> for DartError {
 impl From<Traced<ConstraintsUpdateError>> for DartError {
     #[inline]
     fn from(_: Traced<ConstraintsUpdateError>) -> Self {
-        todo!()
+        // let (err, _) = err.into_parts();
+        //
+        // match err {
+        //     ConstraintsUpdateError::Recovered { .. } => {
+        //         todo!()
+        //     }
+        //     ConstraintsUpdateError::RecoverFailed { .. } => {
+        //         todo!()
+        //     }
+        //     ConstraintsUpdateError::Errored(_) => {
+        //         todo!()
+        //     }
+        // }
+        unimplemented!()
     }
 }
 
@@ -438,6 +498,19 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
         .into()
 }
 
+/// Sets callback, invoked when a connection with server is lost.
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__on_failed_local_media(
+    this: ptr::NonNull<RoomHandle>,
+    cb: Dart_Handle,
+) -> DartResult {
+    let this = this.as_ref();
+
+    this.on_failed_local_media(platform::Function::new(cb))
+        .map_err(DartError::from)
+        .into()
+}
+
 /// Frees the data behind the provided pointer.
 ///
 /// # Safety
@@ -455,10 +528,11 @@ mod mock {
 
     use crate::{
         api::{
-            ConnectionHandle, LocalMediaTrack, MediaStreamSettings,
-            ReconnectHandle,
+            dart::utils::DartError, ConnectionHandle, LocalMediaTrack,
+            MediaStreamSettings, ReconnectHandle,
         },
         media::MediaSourceKind,
+        peer::{LocalMediaError, TracksRequestError, UpdateLocalStreamError},
         platform,
         room::{
             ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -517,12 +591,18 @@ mod mock {
                 .map(drop)
         }
 
-        // pub fn on_failed_local_media(
-        //     &self,
-        //     f: Callback<JasonError>,
-        // ) {
-        //     // Result<(), JasonError>
-        // }
+        pub fn on_failed_local_media(
+            &self,
+            cb: platform::Function<DartError>,
+        ) -> Result<(), Traced<HandleDetachedError>> {
+            let err = LocalMediaError::UpdateLocalStreamError(
+                UpdateLocalStreamError::InvalidLocalTracks(
+                    TracksRequestError::NoTracks,
+                ),
+            );
+            cb.call1(tracerr::new!(err).into());
+            Ok(())
+        }
 
         pub async fn set_local_media_settings(
             &self,

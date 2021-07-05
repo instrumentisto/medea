@@ -32,6 +32,14 @@ void registerFunctions(DynamicLibrary dl) {
       'register_new_rpc_client_exception_caller')(Pointer.fromFunction<
           Handle Function(Uint8, Pointer<Utf8>, ForeignValue, Pointer<Utf8>)>(
       _newRpcClientException));
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_new_media_state_transition_exception_caller')(
+      Pointer.fromFunction<Handle Function(Pointer<Utf8>, Pointer<Utf8>)>(
+          _newMediaStateTransitionException));
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_new_internal_exception_caller')(Pointer.fromFunction<
+          Handle Function(Pointer<Utf8>, ForeignValue, Pointer<Utf8>)>(
+      _newInternalException));
 }
 
 /// Creates a new [ArgumentError] from the provided invalid [value], its [name]
@@ -79,6 +87,22 @@ Object _newRpcClientException(int kind, Pointer<Utf8> message,
       RpcClientExceptionKind.values[kind],
       message.nativeStringToDartString(),
       cause.toDart(),
+      stacktrace.nativeStringToDartString());
+}
+
+/// Creates a new [MediaStateTransitionException] with the provided error
+/// [message] and [stacktrace].
+Object _newMediaStateTransitionException(
+    Pointer<Utf8> message, Pointer<Utf8> stacktrace) {
+  return MediaStateTransitionException(message.nativeStringToDartString(),
+      stacktrace.nativeStringToDartString());
+}
+
+/// Creates a new [InternalException] with the provided error
+/// [message] and [stacktrace].
+Object _newInternalException(
+    Pointer<Utf8> message, ForeignValue cause, Pointer<Utf8> stacktrace) {
+  return InternalException(message.nativeStringToDartString(), cause.toDart(),
       stacktrace.nativeStringToDartString());
 }
 
@@ -171,9 +195,35 @@ enum RpcClientExceptionKind {
 
   /// RPC session has been finished. This is a terminal state.
   SessionFinished,
+}
 
-  /// Internal error that is not meant to be handled by external users.
-  ///
-  /// This is a programmatic error.
-  InternalError,
+/// Exception thrown when the requested media state transition could not be
+/// performed.
+class MediaStateTransitionException implements Exception {
+  /// Error message describing the problem.
+  late String message;
+
+  /// Native stacktrace.
+  late String nativeStackTrace;
+
+  /// Instantiates a new [MediaStateTransitionException].
+  MediaStateTransitionException(this.message, this.nativeStackTrace);
+}
+
+/// Jason's internal exception.
+///
+/// This is either a programmatic error or some unexpected platform component
+/// failure that cannot be handled in any way.
+class InternalException implements Exception {
+  /// Error message describing the problem.
+  late String message;
+
+  /// Dart [Exception] or [Error] that caused this [InternalException].
+  late Object? cause;
+
+  /// Native stacktrace.
+  late String nativeStackTrace;
+
+  /// Instantiates a new [InternalException].
+  InternalException(this.message, this.cause, this.nativeStackTrace);
 }

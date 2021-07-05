@@ -340,6 +340,18 @@ void main() {
             isFormatException,
             predicate(
                 (e) => e.message.contains('relative URL without a base'))));
+
+    var localMediaErr = Completer<Object>();
+    room.onFailedLocalMedia((err) {
+      localMediaErr.complete(err);
+    });
+    var err = await localMediaErr.future;
+    expect(
+        err,
+        predicate((e) =>
+            e is MediaStateTransitionException &&
+            e.message == 'SimpleTracksRequest should have at least one track' &&
+            e.nativeStackTrace.contains('at jason/src')));
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {
@@ -406,9 +418,9 @@ void main() {
         () => returnsRpcClientException('Dart err cause1').unwrap(),
         throwsA(predicate((e) =>
             e is RpcClientException &&
-            e.kind == RpcClientExceptionKind.InternalError &&
+            e.kind == RpcClientExceptionKind.ConnectionLost &&
             e.cause == 'Dart err cause1' &&
-            e.message == 'RpcClientException::InternalError' &&
+            e.message == 'RpcClientException::ConnectionLost' &&
             e.nativeStackTrace.contains('at jason/src'))));
 
     var exception5;

@@ -3,7 +3,7 @@
 mod backoff_delayer;
 mod heartbeat;
 mod reconnect_handle;
-mod rpc_session;
+pub mod rpc_session;
 pub mod websocket;
 
 use std::str::FromStr;

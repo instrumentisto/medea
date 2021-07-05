@@ -31,6 +31,10 @@ typedef _onConnectionLoss_C = Result Function(Pointer, Handle);
 typedef _onConnectionLoss_Dart = Result Function(
     Pointer, void Function(Pointer));
 
+typedef _onFailedLocalMedia_C = Result Function(Pointer, Handle);
+typedef _onFailedLocalMedia_Dart = Result Function(
+    Pointer, void Function(Pointer<Handle>));
+
 typedef _join_C = Handle Function(Pointer, Pointer<Utf8>);
 typedef _join_Dart = Object Function(Pointer, Pointer<Utf8>);
 
@@ -90,6 +94,10 @@ final _onLocalTrack = dl.lookupFunction<_onLocalTrack_C, _onLocalTrack_Dart>(
 final _onConnectionLoss =
     dl.lookupFunction<_onConnectionLoss_C, _onConnectionLoss_Dart>(
         'RoomHandle__on_connection_loss');
+
+final _onFailedLocalMedia =
+    dl.lookupFunction<_onFailedLocalMedia_C, _onFailedLocalMedia_Dart>(
+        'RoomHandle__on_failed_local_media');
 
 final _join = dl.lookupFunction<_join_C, _join_Dart>('RoomHandle__join');
 
@@ -345,18 +353,16 @@ class RoomHandle {
     }).unwrap();
   }
 
-  // TODO: Implement.
-  // /// Sets `on_failed_local_media` callback, invoked on a local media
-  // /// acquisition failures.
-  // ///
-  // /// # Errors
-  // ///
-  // /// Throws [StateError] if the underlying [Pointer] has been freed.
-  // void onFailedLocalMedia(void Function(ReconnectHandle) f) {
-  //   _onConnectionLoss(ptr.getInnerPtr(), (t) {
-  //     f(ReconnectHandle(NullablePointer(t)));
-  //   }).unwrap();
-  // }
+  /// Sets callback, invoked on a local media acquisition failures.
+  ///
+  /// # Errors
+  ///
+  /// Throws [StateError] if the underlying [Pointer] has been freed.
+  void onFailedLocalMedia(void Function(Object) f) {
+    _onFailedLocalMedia(ptr.getInnerPtr(), (err) {
+      f(err);
+    }).unwrap();
+  }
 
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
