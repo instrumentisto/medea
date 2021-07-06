@@ -269,38 +269,38 @@ mod spec {
     fn redis_db_overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__DB__REDIS__HOST" => "5.5.5.5",
-            "MEDEA_TURN__DB__REDIS__PORT" => "1234",
-            "MEDEA_TURN__DB__REDIS__PASS" => "hellofellow",
-            "MEDEA_TURN__DB__REDIS__DB_NUMBER" => "10",
-            "MEDEA_TURN__DB__REDIS__CONNECT_TIMEOUT" => "10s",
+            "MEDEA_TURN__COTURN__DB__REDIS__HOST" => "5.5.5.5",
+            "MEDEA_TURN__COTURN__DB__REDIS__PORT" => "1234",
+            "MEDEA_TURN__COTURN__DB__REDIS__PASS" => "hellofellow",
+            "MEDEA_TURN__COTURN__DB__REDIS__DB_NUMBER" => "10",
+            "MEDEA_TURN__COTURN__DB__REDIS__CONNECT_TIMEOUT" => "10s",
         );
 
         assert_ne!(
-            default_conf.turn.db.redis.host,
-            env_conf.turn.db.redis.host,
+            default_conf.turn.coturn.db.redis.host,
+            env_conf.turn.coturn.db.redis.host,
         );
         assert_ne!(
-            default_conf.turn.db.redis.port,
-            env_conf.turn.db.redis.port,
+            default_conf.turn.coturn.db.redis.port,
+            env_conf.turn.coturn.db.redis.port,
         );
         assert_ne!(
-            default_conf.turn.db.redis.pass,
-            env_conf.turn.db.redis.pass,
+            default_conf.turn.coturn.db.redis.pass,
+            env_conf.turn.coturn.db.redis.pass,
         );
         assert_ne!(
-            default_conf.turn.db.redis.db_number,
-            env_conf.turn.db.redis.db_number,
+            default_conf.turn.coturn.db.redis.db_number,
+            env_conf.turn.coturn.db.redis.db_number,
         );
         assert_ne!(
-            default_conf.turn.db.redis.connect_timeout,
-            env_conf.turn.db.redis.connect_timeout,
+            default_conf.turn.coturn.db.redis.connect_timeout,
+            env_conf.turn.coturn.db.redis.connect_timeout,
         );
 
-        assert_eq!(env_conf.turn.db.redis.host, "5.5.5.5");
-        assert_eq!(env_conf.turn.db.redis.port, 1234);
+        assert_eq!(env_conf.turn.coturn.db.redis.host, "5.5.5.5");
+        assert_eq!(env_conf.turn.coturn.db.redis.port, 1234);
         assert_eq!(
-            env_conf.turn.db.redis.connect_timeout,
+            env_conf.turn.coturn.db.redis.connect_timeout,
             Duration::from_secs(10),
         );
     }
@@ -310,20 +310,20 @@ mod spec {
     fn overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__HOST" => "example.com",
-            "MEDEA_TURN__PORT" => "1234",
-            "MEDEA_TURN__USER" => "ferris",
-            "MEDEA_TURN__PASS" => "qwerty",
+            "MEDEA_TURN__COTURN__HOST" => "example.com",
+            "MEDEA_TURN__COTURN__PORT" => "1234",
+            "MEDEA_TURN__COTURN__USER" => "ferris",
+            "MEDEA_TURN__COTURN__PASS" => "qwerty",
         );
 
-        assert_ne!(default_conf.turn.host, env_conf.turn.host);
-        assert_ne!(default_conf.turn.port, env_conf.turn.port);
-        assert_ne!(default_conf.turn.user, env_conf.turn.user);
-        assert_ne!(default_conf.turn.pass, env_conf.turn.pass);
+        assert_ne!(default_conf.turn.coturn.host, env_conf.turn.coturn.host);
+        assert_ne!(default_conf.turn.coturn.port, env_conf.turn.coturn.port);
+        assert_ne!(default_conf.turn.coturn.user, env_conf.turn.coturn.user);
+        assert_ne!(default_conf.turn.coturn.pass, env_conf.turn.coturn.pass);
 
-        assert_eq!(env_conf.turn.host, "example.com");
-        assert_eq!(env_conf.turn.port, 1234);
-        assert_eq!(env_conf.turn.addr(), "example.com:1234");
+        assert_eq!(env_conf.turn.coturn.host, "example.com");
+        assert_eq!(env_conf.turn.coturn.port, 1234);
+        assert_eq!(env_conf.turn.coturn.addr(), "example.com:1234");
     }
 
     #[test]
@@ -331,18 +331,27 @@ mod spec {
     fn coturn_cli() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__CLI__HOST" => "4.4.4.4",
-            "MEDEA_TURN__CLI__PORT" => "1234",
-            "MEDEA_TURN__CLI__PASS" => "clipass",
+            "MEDEA_TURN__COTURN__CLI__HOST" => "4.4.4.4",
+            "MEDEA_TURN__COTURN__CLI__PORT" => "1234",
+            "MEDEA_TURN__COTURN__CLI__PASS" => "clipass",
         );
 
-        assert_ne!(default_conf.turn.cli.host, env_conf.turn.cli.host);
-        assert_ne!(default_conf.turn.cli.port, env_conf.turn.cli.port);
-        assert_ne!(default_conf.turn.cli.pass, env_conf.turn.cli.pass);
+        assert_ne!(
+            default_conf.turn.coturn.cli.host,
+            env_conf.turn.coturn.cli.host
+        );
+        assert_ne!(
+            default_conf.turn.coturn.cli.port,
+            env_conf.turn.coturn.cli.port
+        );
+        assert_ne!(
+            default_conf.turn.coturn.cli.pass,
+            env_conf.turn.coturn.cli.pass
+        );
 
-        assert_eq!(env_conf.turn.cli.host, "4.4.4.4");
-        assert_eq!(env_conf.turn.cli.port, 1234);
-        assert_eq!(env_conf.turn.cli.pass, "clipass");
+        assert_eq!(env_conf.turn.coturn.cli.host, "4.4.4.4");
+        assert_eq!(env_conf.turn.coturn.cli.port, 1234);
+        assert_eq!(env_conf.turn.coturn.cli.pass, "clipass");
     }
 
     #[test]
@@ -350,37 +359,40 @@ mod spec {
     fn coturn_cli_pool() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_TURN__CLI__POOL__MAX_SIZE" => "10",
-            "MEDEA_TURN__CLI__POOL__WAIT_TIMEOUT" => "1s",
-            "MEDEA_TURN__CLI__POOL__CONNECT_TIMEOUT" => "4s",
-            "MEDEA_TURN__CLI__POOL__RECYCLE_TIMEOUT" => "3s",
+            "MEDEA_TURN__COTURN__CLI__POOL__MAX_SIZE" => "10",
+            "MEDEA_TURN__COTURN__CLI__POOL__WAIT_TIMEOUT" => "1s",
+            "MEDEA_TURN__COTURN__CLI__POOL__CONNECT_TIMEOUT" => "4s",
+            "MEDEA_TURN__COTURN__CLI__POOL__RECYCLE_TIMEOUT" => "3s",
         );
 
         assert_ne!(
-            default_conf.turn.cli.pool.max_size,
-            env_conf.turn.cli.pool.max_size,
+            default_conf.turn.coturn.cli.pool.max_size,
+            env_conf.turn.coturn.cli.pool.max_size,
         );
         assert_ne!(
-            default_conf.turn.cli.pool.wait_timeout,
-            env_conf.turn.cli.pool.wait_timeout,
+            default_conf.turn.coturn.cli.pool.wait_timeout,
+            env_conf.turn.coturn.cli.pool.wait_timeout,
         );
         assert_ne!(
-            default_conf.turn.cli.pool.connect_timeout,
-            env_conf.turn.cli.pool.connect_timeout,
+            default_conf.turn.coturn.cli.pool.connect_timeout,
+            env_conf.turn.coturn.cli.pool.connect_timeout,
         );
         assert_ne!(
-            default_conf.turn.cli.pool.recycle_timeout,
-            env_conf.turn.cli.pool.recycle_timeout,
+            default_conf.turn.coturn.cli.pool.recycle_timeout,
+            env_conf.turn.coturn.cli.pool.recycle_timeout,
         );
 
-        assert_eq!(env_conf.turn.cli.pool.max_size, 10);
-        assert_eq!(env_conf.turn.cli.pool.wait_timeout, Duration::from_secs(1));
+        assert_eq!(env_conf.turn.coturn.cli.pool.max_size, 10);
         assert_eq!(
-            env_conf.turn.cli.pool.connect_timeout,
+            env_conf.turn.coturn.cli.pool.wait_timeout,
+            Duration::from_secs(1)
+        );
+        assert_eq!(
+            env_conf.turn.coturn.cli.pool.connect_timeout,
             Duration::from_secs(4),
         );
         assert_eq!(
-            env_conf.turn.cli.pool.recycle_timeout,
+            env_conf.turn.coturn.cli.pool.recycle_timeout,
             Duration::from_secs(3),
         );
     }
