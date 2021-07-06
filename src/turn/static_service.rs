@@ -5,7 +5,6 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use derive_more::Display;
 use medea_client_api_proto::{IceServer, PeerId, RoomId};
 
 use crate::{
@@ -14,20 +13,18 @@ use crate::{
 };
 
 /// Kind of [`StaticIceUser`].
-#[derive(Debug, Display, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Kind {
     /// This is [TURN] [ICE] user.
     ///
     /// [TURN]: https://webrtcglossary.com/turn/
     /// [ICE]: https://webrtcglossary.com/ice/
-    #[display(fmt = "turn")]
     Turn,
 
     /// This is [STUN] [ICE] user.
     ///
     /// [STUN]: https://webrtcglossary.com/stun/
     /// [ICE]: https://webrtcglossary.com/ice/
-    #[display(fmt = "stun")]
     Stun,
 }
 
@@ -56,7 +53,7 @@ impl FromStr for Kind {
             });
         }
 
-        match &s[0..3] {
+        match &s[0..4] {
             "stun" => Ok(Kind::Stun),
             "turn" => Ok(Kind::Turn),
             _ => Err(InvalidKindErr {
@@ -102,7 +99,7 @@ impl StaticIceUser {
     /// Returns [`IceServer`] of this [`StaticIceUser`].
     pub fn ice_server(&self) -> IceServer {
         IceServer {
-            urls: vec![format!("{}:{}", self.kind, self.address)],
+            urls: vec![self.address.clone()],
             username: self.username.clone(),
             credential: self.pass.clone(),
         }
