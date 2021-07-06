@@ -42,6 +42,25 @@ pub struct Turn {
     pub r#static: Vec<StaticCredentials>,
 }
 
+/// Static [TURN]/[STUN] server credentials.
+///
+/// [TURN]: https://webrtcglossary.com/turn/
+/// [STUN]: https://webrtcglossary.com/stun/
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct StaticCredentials {
+    /// Address of [TURN]/[STUN] server.
+    ///
+    /// [TURN]: https://webrtcglossary.com/turn/
+    /// [STUN]: https://webrtcglossary.com/stun/
+    pub address: String,
+
+    /// Username for authorization.
+    pub username: Option<String>,
+
+    /// Password for authorization.
+    pub pass: Option<String>,
+}
+
 /// [Coturn] server settings.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
@@ -235,45 +254,6 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
             runtime: Runtime::Tokio1,
         }
     }
-}
-
-/// Static [TURN]/[STUN] servers configuration.
-///
-/// [STUN]: https://webrtcglossary.com/stun/
-/// [TURN]: https://webrtcglossary.com/turn/
-#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
-#[serde(default)]
-pub struct Static {
-    // /// List of static [STUN] servers credentials.
-// ///
-// /// [STUN]: https://webrtcglossary.com/stun/
-// #[serde(rename = "stun")]
-// pub stuns: Vec<StaticCredentials>,
-//
-// /// List of static [TURN] servers credentials.
-// ///
-// /// [TURN]: https://webrtcglossary.com/turn/
-// #[serde(rename = "turn")]
-// pub turns: Vec<StaticCredentials>,
-}
-
-/// Static [TURN]/[STUN] server credentials.
-///
-/// [TURN]: https://webrtcglossary.com/turn/
-/// [STUN]: https://webrtcglossary.com/stun/
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct StaticCredentials {
-    /// Address of [TURN]/[STUN] server.
-    ///
-    /// [TURN]: https://webrtcglossary.com/turn/
-    /// [STUN]: https://webrtcglossary.com/stun/
-    pub address: String,
-
-    /// Username for authorization.
-    pub username: Option<String>,
-
-    /// Password for authorization.
-    pub pass: Option<String>,
 }
 
 #[cfg(test)]
