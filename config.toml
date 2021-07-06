@@ -79,30 +79,6 @@
 
 
 [turn]
-# Host of STUN/TURN server.
-#
-# Env var: MEDEA_TURN__HOST
-# Default:
-#   host = "localhost"
-
-# Port of TURN server.
-#
-# Env var: MEDEA_TURN__PORT
-# Default:
-#   port = 3478
-
-# Name of static user to authenticate on TURN server as.
-#
-# Env var: MEDEA_TURN__USER
-# Default:
-#   user = "USER"
-
-# Password of static user to authenticate on TURN server with.
-#
-# Env var: MEDEA_TURN__PASS
-# Default:
-#   pass = "PASS"
-
 # Mode of TURN/STUN server.
 #
 # If true then static TURN/STUN server will be used and Coturn
@@ -115,101 +91,93 @@
 #   is_static = false
 
 
-# List of static TURN servers credentials.
+[turn.coturn]
+# Host of STUN/TURN server.
 #
-# [[turn.static.turn]]
+# Env var: MEDEA_TURN__COTURN__HOST
+# Default:
+#   host = "localhost"
 
-# Host of TURN server.
+# Port of TURN server.
 #
-# address = "localhost:3478"
+# Env var: MEDEA_TURN__COTURN__PORT
+# Default:
+#   port = 3478
 
-# Username for authorization.
+# Name of static user to authenticate on TURN server as.
 #
-# username = "USER"
+# Env var: MEDEA_TURN__COTURN__USER
+# Default:
+#   user = "USER"
 
-# Password for authorization.
+# Password of static user to authenticate on TURN server with.
 #
-# pass = "PASS"
+# Env var: MEDEA_TURN__COTURN__PASS
+# Default:
+#   pass = "PASS"
 
 
-# List of static STUN servers credentials.
-#
-# [[turn.static.stun]]
-
-# Host of STUN server.
-#
-# address = "stun.l.google.com:19302"
-
-# Username for authorization.
-#
-# username = "USER"
-
-# Password for authorization.
-#
-# pass = "PASS"
-
-
-[turn.db.redis]
+[turn.coturn.db.redis]
 # Host of Coturn's Redis database server.
 #
-# Env var: MEDEA_TURN__DB__REDIS__HOST
+# Env var: MEDEA_TURN__COTURN__DB__REDIS__HOST
 # Default:
 #   host = "127.0.0.1"
 
 # Port of Coturn's Redis database server for client connections.
 #
-# Env var: MEDEA_TURN__DB__REDIS__PORT
+# Env var: MEDEA_TURN__COTURN__DB__REDIS__PORT
 # Default:
 #   port = 6379
 
 # User to authenticate on Coturn's Redis database server as.
 #
-# Env var: MEDEA_TURN__DB__REDIS__USERNAME
+# Env var: MEDEA_TURN__COTURN__DB__REDIS__USERNAME
 # Default:
 #   user = ""
 
 # Password to authenticate on Coturn's Redis database server with.
 #
-# Env var: MEDEA_TURN__DB__REDIS__PASS
+# Env var: MEDEA_TURN__COTURN__DB__REDIS__PASS
 # Default:
 #   pass = "turn"
 
 # Number of Coturn's database in Redis.
 #
-# Env var: MEDEA_TURN__DB__REDIS__DB_NUMBER
+# Env var: MEDEA_TURN__COTURN__DB__REDIS__DB_NUMBER
 # Default:
 #   db_number = 0
 
 # Timeout for establishing connection with Coturn's Redis database.
 #
-# Env var: MEDEA_TURN__DB__REDIS__CONNECT_TIMEOUT
+# Env var: MEDEA_TURN__COTURN__DB__REDIS__CONNECT_TIMEOUT
 # Default:
 #   connect_timeout = "5s"
 
 
-[turn.cli]
+[turn.coturn.cli]
 # Host of Coturn's admin interface.
 #
-# Env var: MEDEA_TURN__CLI__HOST
+# Env var: MEDEA_TURN__COTURN__CLI__HOST
 # Default:
 #   host = "127.0.0.1"
 
 # Port of Coturn's admin interface for Telnet connections.
 #
-# Env var: MEDEA_TURN__CLI__PORT
+# Env var: MEDEA_TURN__COTURN__CLI__PORT
 # Default:
 #   port = 5766
 
 # Password to authenticate on Coturn's admin interface with.
 #
-# Env var: MEDEA_TURN__CLI__PASS
+# Env var: MEDEA_TURN__COTURN__CLI__PASS
 # Default:
 #   pass = "turn"
 
-[turn.cli.pool]
+[turn.coturn.cli.pool]
 # Maximum pool size of connections to Coturn's admin interface.
 #
-# Env var: MEDEA_TURN__CLI__POOL__MAX_SIZE
+# Env var: MEDEA_TURN__COTURN__CLI__POOL__MAX_SIZE
 # Default:
 #   max_size = 16
 
@@ -217,7 +185,7 @@
 #
 # "0" means no timeout and is not recommended.
 #
-# Env var: MEDEA_TURN__CLI__POOL__WAIT_TIMEOUT
+# Env var: MEDEA_TURN__COTURN__CLI__POOL__WAIT_TIMEOUT
 # Default:
 #   wait_timeout = "2s"
 
@@ -225,7 +193,7 @@
 #
 # "0" means no timeout and is not recommended.
 #
-# Env var: MEDEA_TURN__CLI__POOL__CONNECT_TIMEOUT
+# Env var: MEDEA_TURN__COTURN__CLI__POOL__CONNECT_TIMEOUT
 # Default:
 #   connect_timeout = "2s"
 
@@ -233,9 +201,26 @@
 #
 # "0" means no timeout and is not recommended.
 #
-# Env var: MEDEA_TURN__CLI__POOL__RECYCLE_TIMEOUT
+# Env var: MEDEA_TURN__COTURN__CLI__POOL__RECYCLE_TIMEOUT
 # Default:
 #   recycle_timeout = "2s"
+
+
+# List of static STUN/TURN servers credentials.
+#
+# [[turn.static]]
+
+# Host of STUN server.
+#
+# address = "stun:stun.l.google.com:19302"
+
+# Username for authorization.
+#
+# username = "USER"
+
+# Password for authorization.
+#
+# pass = "PASS"
 
 
 

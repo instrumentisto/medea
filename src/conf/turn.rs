@@ -11,6 +11,43 @@ use smart_default::SmartDefault;
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Turn {
+    /// Mode of [TURN]/[STUN] server.
+    ///
+    /// If `true` then static [TURN]/[STUN] servers will be used and [Coturn]
+    /// is not required.
+    ///
+    /// Otherwise, [Coturn] is strictly required.
+    ///
+    /// Defaults to `false`.
+    ///
+    /// [STUN]: https://webrtcglossary.com/stun/
+    /// [TURN]: https://webrtcglossary.com/turn/
+    /// [Coturn]: https://github.com/coturn/coturn
+    #[default = false]
+    pub is_static: bool,
+
+    /// [Coturn] server settings.
+    ///
+    /// Will be used when `is_static` is `false`.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    pub coturn: Coturn,
+
+    /// Static [TURN]/[STUN] servers configuration.
+    ///
+    /// Will be used when `is_static` is `true`.
+    ///
+    /// [STUN]: https://webrtcglossary.com/stun/
+    /// [TURN]: https://webrtcglossary.com/turn/
+    pub r#static: Vec<StaticCredentials>,
+}
+
+/// [Coturn] server settings.
+///
+/// [Coturn]: https://github.com/coturn/coturn
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct Coturn {
     /// Host of STUN/TURN server.
     ///
     /// Defaults to `localhost`.
@@ -40,30 +77,9 @@ pub struct Turn {
 
     /// Admin interface settings.
     pub cli: CoturnCli,
-
-    /// Mode of [TURN]/[STUN] server.
-    ///
-    /// If `true` then static [TURN]/[STUN] servers will be used and [Coturn]
-    /// is not required.
-    ///
-    /// Otherwise, [Coturn] is strictly required.
-    ///
-    /// Defaults to `false`.
-    ///
-    /// [STUN]: https://webrtcglossary.com/stun/
-    /// [TURN]: https://webrtcglossary.com/turn/
-    /// [Coturn]: https://github.com/coturn/coturn
-    #[default = false]
-    pub is_static: bool,
-
-    /// Static [TURN]/[STUN] servers configuration.
-    ///
-    /// [STUN]: https://webrtcglossary.com/stun/
-    /// [TURN]: https://webrtcglossary.com/turn/
-    pub r#static: Static,
 }
 
-impl Turn {
+impl Coturn {
     /// Builds [`String`] addr from `host` and `port`.
     #[inline]
     #[must_use]
@@ -228,17 +244,17 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Static {
-    /// List of static [STUN] servers credentials.
-    ///
-    /// [STUN]: https://webrtcglossary.com/stun/
-    #[serde(rename = "stun")]
-    pub stuns: Vec<StaticCredentials>,
-
-    /// List of static [TURN] servers credentials.
-    ///
-    /// [TURN]: https://webrtcglossary.com/turn/
-    #[serde(rename = "turn")]
-    pub turns: Vec<StaticCredentials>,
+    // /// List of static [STUN] servers credentials.
+// ///
+// /// [STUN]: https://webrtcglossary.com/stun/
+// #[serde(rename = "stun")]
+// pub stuns: Vec<StaticCredentials>,
+//
+// /// List of static [TURN] servers credentials.
+// ///
+// /// [TURN]: https://webrtcglossary.com/turn/
+// #[serde(rename = "turn")]
+// pub turns: Vec<StaticCredentials>,
 }
 
 /// Static [TURN]/[STUN] server credentials.

@@ -50,7 +50,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
+    convert::{TryFrom, TryInto as _},
     fmt,
     rc::Rc,
 };
@@ -58,9 +58,9 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    state, AudioSettings, Direction, IceCandidate, IceServer, MediaSourceKind,
-    MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, PeerUpdate,
-    Track, TrackId, TrackPatchCommand, TrackPatchEvent, VideoSettings,
+    state, AudioSettings, Direction, IceCandidate, MediaSourceKind, MediaType,
+    MemberId, NegotiationRole, PeerId as Id, PeerId, PeerUpdate, Track,
+    TrackId, TrackPatchCommand, TrackPatchEvent, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -73,7 +73,7 @@ use crate::{
         },
         peers::Counter,
     },
-    turn::IceUser,
+    turn::{IceUser, IceUsers},
 };
 
 /// Subscriber to the events indicating that [`Peer`] was updated.
@@ -172,7 +172,7 @@ impl PeerError {
 #[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn ice_servers_list(&self) -> Vec<IceServer>)]
+#[enum_delegate(pub fn ice_users(&self) -> &IceUsers)]
 #[enum_delegate(pub fn add_ice_users(&mut self, ice_users: Vec<IceUser>))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
@@ -263,7 +263,7 @@ impl PeerStateMachine {
             senders: self.get_senders_states(),
             receivers: self.get_receivers_states(),
             force_relay: self.is_force_relayed(),
-            ice_servers: self.ice_servers_list(),
+            ice_servers: self.ice_users().try_into().unwrap(),
             negotiation_role: self.negotiation_role(),
             local_sdp: self.local_sdp().map(ToOwned::to_owned),
             remote_sdp: self.remote_sdp().map(ToOwned::to_owned),
@@ -415,8 +415,8 @@ pub struct Context {
     /// [`MemberId`] of a partner [`Peer`]'s owner.
     partner_member: MemberId,
 
-    /// [`IceUser`] created for this [`Peer`].
-    ice_users: Vec<IceUser>,
+    /// [`IceUser`]s created for this [`Peer`].
+    ice_users: IceUsers,
 
     /// [SDP] offer of this [`Peer`].
     ///
@@ -811,21 +811,19 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`]s.
+    /// Returns [`IceUsers`] created for this [`Peer`].
     #[inline]
-    pub fn ice_servers_list(&self) -> Vec<IceServer> {
-        self.context
-            .ice_users
-            .iter()
-            .flat_map(IceUser::servers_list)
-            .collect()
+    pub fn ice_users(&self) -> &IceUsers {
+        &self.context.ice_users
     }
 
     /// Adds [`IceUser`]s, which is used to generate [`IceServer`]s of this
     /// [`Peer`].
+    ///
+    /// [`IceServer`]: medea_client_api_proto::IceServer
     #[inline]
-    pub fn add_ice_users(&mut self, mut ice_users: Vec<IceUser>) {
-        self.context.ice_users.append(&mut ice_users);
+    pub fn add_ice_users(&mut self, ice_users: Vec<IceUser>) {
+        self.context.ice_users.add(ice_users);
     }
 
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
@@ -1190,7 +1188,7 @@ impl Peer<Stable> {
             member_id,
             partner_peer,
             partner_member,
-            ice_users: Vec::new(),
+            ice_users: IceUsers::new(),
             local_sdp: None,
             remote_sdp: None,
             receivers: HashMap::new(),

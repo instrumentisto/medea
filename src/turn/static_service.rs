@@ -2,12 +2,13 @@
 //!
 //! [ICE]: https://webrtcglossary.com/ice/
 
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use derive_more::Display;
 use medea_client_api_proto::{IceServer, PeerId, RoomId};
 
 use crate::{
-    conf,
     conf::turn::StaticCredentials,
     turn::{IceUser, TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
@@ -30,6 +31,42 @@ enum Kind {
     Stun,
 }
 
+/// Error which indicates that incorrect [`Kind`] was found while parsing.
+#[derive(Debug)]
+pub struct InvalidKindErr {
+    /// TURN/STUN address on which this error happened.
+    pub address: String,
+
+    /// Found incorrect [`Kind`].
+    pub kind: String,
+}
+
+impl FromStr for Kind {
+    type Err = InvalidKindErr;
+
+    /// Lookups first 4 symbols and if the are `stun` or `turn`, then returns
+    /// matching [`Kind`].
+    ///
+    /// If incorrect symbols are found, then returns [`InvalidKindErr`].
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() < 4 {
+            return Err(InvalidKindErr {
+                address: s.to_string(),
+                kind: s.to_string(),
+            });
+        }
+
+        match &s[0..3] {
+            "stun" => Ok(Kind::Stun),
+            "turn" => Ok(Kind::Turn),
+            _ => Err(InvalidKindErr {
+                address: s.to_string(),
+                kind: s[0..3].to_string(),
+            }),
+        }
+    }
+}
+
 /// Static [ICE] user credentials which will be provided to the client.
 #[derive(Debug, Clone)]
 pub struct StaticIceUser {
@@ -47,14 +84,17 @@ pub struct StaticIceUser {
 }
 
 impl StaticIceUser {
-    /// Returns new [`StaticIceUser`] with a provided credentials and [`Kind`].
-    fn new(creds: StaticCredentials, kind: Kind) -> Self {
-        Self {
+    /// Returns new [`StaticIceUser`] with a provided [`StaticCredentials`].
+    ///
+    /// Returns [`TurnServiceErr`] if incorrect [`Kind`] found in the provided
+    /// [`StaticCredentials`].
+    fn new(creds: StaticCredentials) -> Result<Self, TurnServiceErr> {
+        Ok(Self {
+            kind: creds.address.parse()?,
             address: creds.address,
             username: creds.username,
             pass: creds.pass,
-            kind,
-        }
+        })
     }
 }
 
@@ -78,18 +118,15 @@ pub struct StaticService(Vec<StaticIceUser>);
 impl StaticService {
     /// Returns new [`StaticService`] based on the provided
     /// [`conf::turn::Static`].
-    pub fn new(cf: &conf::turn::Static) -> Self {
-        Self(
-            cf.stuns
-                .iter()
-                .map(|creds| StaticIceUser::new(creds.clone(), Kind::Stun))
-                .chain(
-                    cf.turns.iter().map(|creds| {
-                        StaticIceUser::new(creds.clone(), Kind::Turn)
-                    }),
-                )
-                .collect(),
-        )
+    ///
+    /// Returns [`TurnServiceErr::InvalidKindInStaticCredentials`] if incorrect
+    /// [`Kind`] found in the provided [`StaticCredentials`].
+    pub fn new(creds: &[StaticCredentials]) -> Result<Self, TurnServiceErr> {
+        let mut ice_users = Vec::new();
+        for c in creds {
+            ice_users.push(StaticIceUser::new(c.clone())?);
+        }
+        Ok(Self(ice_users))
     }
 }
 

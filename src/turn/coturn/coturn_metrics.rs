@@ -16,6 +16,7 @@ use futures::{channel::mpsc, future, StreamExt as _};
 use redis::{ConnectionInfo, RedisError};
 
 use crate::{
+    conf,
     log::prelude::*,
     signalling::peers::{FlowMetricSource, PeerTrafficWatcher},
 };
@@ -58,7 +59,7 @@ impl CoturnMetricsService {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     #[allow(dead_code)]
     pub fn new(
-        cf: &crate::conf::turn::Turn,
+        cf: &conf::turn::Coturn,
         peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RedisError> {
         let client = redis::Client::open(ConnectionInfo::from(&cf.db.redis))?;

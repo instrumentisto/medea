@@ -6,6 +6,26 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.3.0] · 2021-??-??
+[0.3.0]: /../../tree/medea-0.3.0
+
+[Diff](/../../compare/medea-0.2.0...medea-0.3.0) | [Milestone](/../../milestone/3) | [Roadmap](/../../issues/182)
+
+### BC Breaks
+
+- Configuration:
+  - Move `[turn]` section to `[turn.coturn]` ([#211]).
+    
+### Added
+- Configuration:
+    - `turn.is_static` option to configure [TURN]/[STUN] server mode ([#211]);
+    - `[[turn.static]]` option to configure static [TURN]/[STUN] servers credentials ([#211]);
+
+[#211]: /../../pull/211
+
+
+
+
 ## [0.2.0] · 2021-04-09
 [0.2.0]: /../../tree/medea-0.2.0
 
@@ -59,10 +79,7 @@ All user visible changes to this project will be documented in this file. This p
     - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
         - `max_lag`;
         - `init_timeout`.
-    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s [Redis] database server as ([#135]);
-    - `turn.is_static` option to configure [TURN]/[STUN] server mode ([#211]);
-    - `[[turn.static.stun]]` option to configure static [STUN] servers credentials ([#211]);
-    - `[[turn.static.turn]]` option to configure static [TURN] servers credentials ([#211]).
+    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s [Redis] database server as ([#135]).
 - Testing:
     - E2E tests for signalling ([#28]).
 

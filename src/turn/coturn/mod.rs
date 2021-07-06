@@ -87,7 +87,7 @@ impl Service {
     ///
     /// Errors with [`TurnServiceErr::TurnAuthRepoErr`] if authentication in
     /// Redis fails.
-    pub fn new(cf: &conf::Turn) -> Result<Self, TurnServiceErr> {
+    pub fn new(cf: &conf::turn::Coturn) -> Result<Self, TurnServiceErr> {
         let turn_db = TurnDatabase::new(
             cf.db.redis.connect_timeout,
             ConnectionInfo::from(&cf.db.redis),
