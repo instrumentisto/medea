@@ -81,16 +81,14 @@
 [turn]
 # Mode of TURN/STUN server.
 #
-# Available modes:
-# `coturn` - using Coturn. In this case Medea will dynamically create and
-#            cleanup Coturn credentials, kill Coturn connections via admin
-#            CLI, gather allocation traffic information.
-# `static` - all Medea cleints will use the provided static list of ICE
-#            servers.
+# If false then Medea will dynamically create and cleanup Coturn credentials,
+# kill Coturn connections via admin CLI, gather allocation traffic information.
 #
-# Env var: MEDEA_TURN__MODE
+# Otherwise all Medea cleints will use the provided static list of ICE servers.
+#
+# Env var: MEDEA_TURN__IS_STATIC
 # Default:
-#   mode = "coturn"
+#   is_static = false
 
 
 [turn.coturn]
@@ -210,19 +208,28 @@
 
 # List of static STUN/TURN servers credentials.
 #
-# [[turn.static.servers]]
+# [turn.static_servers.$(SERVER_NAME)]
 
-# Host of STUN server.
+# Urls to STUN/TURN server.
 #
-# urls = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+# Env var: MEDEA_TURN__STATIC_SERVERS__$(SERVER_NAME)__URLS
+# Example:
+#   urls = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+# Default is empty.
 
 # Optional username for authorization.
 #
-# username = "USER"
+# Env var: MEDEA_TURN__STATIC_SERVERS__$(SERVER_NAME)__USERNAME
+# Example:
+#   username = "USER"
+# Default is none.
 
 # Optional credential for authorization.
 #
-# credential = "PASS"
+# Env var: MEDEA_TURN__STATIC_SERVERS__$(SERVER_NAME)__CREDENTIAL
+# Example:
+#   credential = "PASS"
+# Default is none.
 
 
 

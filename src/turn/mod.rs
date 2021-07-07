@@ -71,13 +71,11 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
-    match cf {
-        conf::Turn::Static { r#static } => {
-            Ok(Arc::new(StaticService::new(r#static.servers.clone())))
-        }
-        conf::Turn::Coturn { coturn } => {
-            Ok(Arc::new(CoturnService::new(coturn)?))
-        }
+    if cf.is_static {
+        let static_servers = cf.static_servers.values().cloned().collect();
+        Ok(Arc::new(StaticService::new(static_servers)))
+    } else {
+        Ok(Arc::new(CoturnService::new(&cf.coturn)?))
     }
 }
 
