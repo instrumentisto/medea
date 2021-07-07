@@ -207,26 +207,49 @@ class RoomHandle {
         stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Mutes outbound audio in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.unmuteAudio] was
+  /// called while muting or a media server didn't approve this state
+  /// transition.
   Future<void> muteAudio() async {
     await (_muteAudio(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Unmutes outbound audio in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.muteAudio] was
+  /// called while unmuting or a media server didn't approve this state
+  /// transition.
   Future<void> unmuteAudio() async {
     await (_unmuteAudio(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Enables outbound audio in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.disableAudio] was
+  /// called while enabling or a media server didn't approve this state
+  /// transition.
+  ///
+  /// Throws a `LocalMediaInitException` if a request of platform media devices
+  /// access failed.
   Future<void> enableAudio() async {
     await (_enableAudio(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Disables outbound audio in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableAudio] was
+  /// called while disabling or a media server didn't approve this state
+  /// transition.
   Future<void> disableAudio() async {
     await (_disableAudio(ptr.getInnerPtr()) as Future);
   }
@@ -234,6 +257,12 @@ class RoomHandle {
   /// Mutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.unmuteVideo] was
+  /// called while muting or a media server didn't approve this state
+  /// transition.
   Future<void> muteVideo([MediaSourceKind? kind]) async {
     var kind_arg =
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
@@ -247,6 +276,12 @@ class RoomHandle {
   /// Unmutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.muteVideo] was
+  /// called while unmuting or a media server didn't approve this state
+  /// transition.
   Future<void> unmuteVideo([MediaSourceKind? kind]) async {
     var kind_arg =
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
@@ -260,6 +295,15 @@ class RoomHandle {
   /// Enables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.disableVideo] was
+  /// called while enabling or a media server didn't approve this state
+  /// transition.
+  ///
+  /// Throws a `LocalMediaInitException` if a request of platform media devices
+  /// access failed.
   Future<void> enableVideo([MediaSourceKind? kind]) async {
     var kind_arg =
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
@@ -273,6 +317,12 @@ class RoomHandle {
   /// Disables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableVideo] was
+  /// called while disabling or a media server didn't approve this state
+  /// transition.
   Future<void> disableVideo([MediaSourceKind? kind]) async {
     var kind_arg =
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
@@ -283,26 +333,46 @@ class RoomHandle {
     }
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Enables inbound audio in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableVideo] was
+  /// called while enabling or a media server didn't approve this state
+  /// transition.
   Future<void> enableRemoteAudio() async {
     await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Disables inbound audio in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableRemoteAudio] was
+  /// called while disabling or a media server didn't approve this state
+  /// transition.
   Future<void> disableRemoteAudio() async {
     await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Enables inbound video in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.disableVideo] was
+  /// called while enabling or a media server didn't approve this state
+  /// transition.
   Future<void> enableRemoteVideo() async {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
   /// Disables inbound video in this `Room`.
+  ///
+  /// Throws a [StateError] if the underlying [Pointer] has been freed.
+  ///
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.disableVideo] was
+  /// called while disabling or a media server didn't approve this state
+  /// transition.
   Future<void> disableRemoteVideo() async {
     await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
@@ -354,8 +424,6 @@ class RoomHandle {
   }
 
   /// Sets callback, invoked on a local media acquisition failures.
-  ///
-  /// # Errors
   ///
   /// Throws [StateError] if the underlying [Pointer] has been freed.
   void onFailedLocalMedia(void Function(Object) f) {

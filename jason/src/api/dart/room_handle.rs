@@ -7,14 +7,15 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, DartFuture, DartResult, FormatException,
-            InternalException, IntoDartFuture as _, StateError, MediaStateTransitionException
+            InternalException, IntoDartFuture as _,
+            MediaStateTransitionException, StateError,
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
     peer::{
-        media::sender::CreateError, InsertLocalTracksError,
-        UpdateLocalStreamError, LocalMediaError
+        media::sender::CreateError, InsertLocalTracksError, LocalMediaError,
+        UpdateLocalStreamError,
     },
     platform,
     room::{

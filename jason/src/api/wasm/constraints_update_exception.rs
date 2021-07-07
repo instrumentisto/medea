@@ -25,15 +25,15 @@ impl ConstraintsUpdateException {
         self.0.name()
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// a `RecoveredException` or a `RecoverFailedException`.
+    /// Returns an [`Error`] if this [`ConstraintsUpdateException`]
+    /// represents a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
     pub fn recover_reason(&self) -> Option<Error> {
         self.0.recover_reason().map(Into::into)
     }
 
-    /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
+    /// Returns [`js_sys::Array`] with an [`Error`]s if this
     /// [`ConstraintsUpdateException`] represents a `RecoverFailedException`.
     #[must_use]
     pub fn recover_fail_reasons(&self) -> JsValue {
@@ -46,7 +46,7 @@ impl ConstraintsUpdateException {
             .into()
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// Returns [`Error`] if this [`ConstraintsUpdateException`] represents
     /// an `ErroredException`.
     ///
     /// Returns `undefined` otherwise.

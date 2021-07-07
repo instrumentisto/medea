@@ -140,7 +140,7 @@ async fn error_get_local_stream_on_new_peer() {
     .unwrap();
 
     let (cb, test_result) = js_callback!(|err: api::Error| {
-        cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
+        cb_assert_eq!(&err.name(), "UpdateLocalStreamError");
         cb_assert_eq!(
             &err.message(),
             "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
@@ -2181,7 +2181,7 @@ mod set_local_media_settings {
         let room_handle = api::RoomHandle::from(room.new_handle());
 
         let (cb, test_result) = js_callback!(|err: api::Error| {
-            cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
+            cb_assert_eq!(&err.name(), "SenderCreateError");
             cb_assert_eq!(
                 err.message(),
                 "MediaExchangeState of Sender cannot transit to \
@@ -2227,7 +2227,7 @@ mod set_local_media_settings {
     #[wasm_bindgen_test]
     async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         let (cb, test_result) = js_callback!(|err: api::Error| {
-            cb_assert_eq!(&err.name(), "InvalidLocalTracks");
+            cb_assert_eq!(&err.name(), "UpdateLocalStreamError");
             cb_assert_eq!(
                 &err.message(),
                 "provided multiple device video MediaStreamTracks"
