@@ -16,10 +16,7 @@ use medea_client_api_proto::{PeerId, RoomId};
 
 use crate::{conf, turn::static_service::StaticService};
 
-use self::{
-    coturn::{CoturnCliError, Service as CoturnService, TurnDatabaseErr},
-    static_service::InvalidKindErr,
-};
+use self::coturn::{CoturnCliError, Service as CoturnService, TurnDatabaseErr};
 
 #[doc(inline)]
 pub use self::ice_user::{EmptyIceServersListErr, IceUser, IceUsers};
@@ -39,12 +36,6 @@ pub enum TurnServiceErr {
     #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     #[from(ignore)]
     TimedOut,
-
-    #[display(
-        fmt = "Invalid kind of static credentials was provided in config: {:?}",
-        _0
-    )]
-    InvalidKindInStaticCredentials(InvalidKindErr),
 }
 
 /// Defines [`TurnAuthService`] behaviour if remote database is unreachable
@@ -80,10 +71,13 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
-    if cf.is_static {
-        Ok(Arc::new(StaticService::new(&cf.r#static)?))
-    } else {
-        Ok(Arc::new(CoturnService::new(&cf.coturn)?))
+    match cf {
+        conf::Turn::Static { r#static } => {
+            Ok(Arc::new(StaticService::new(r#static.servers.clone())))
+        }
+        conf::Turn::Coturn { coturn } => {
+            Ok(Arc::new(CoturnService::new(coturn)?))
+        }
     }
 }
 

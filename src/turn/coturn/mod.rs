@@ -1,4 +1,4 @@
-//! Implementation of managing [Coturn] [TURN] server.
+//! Service responsible for managing [Coturn] [TURN] server.
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 //! [TURN]: https://webrtcglossary.com/turn/
@@ -32,7 +32,9 @@ pub use self::{
     cli::CoturnCliError, ice_user::CoturnIceUser, repo::TurnDatabaseErr,
 };
 
-/// Username of Coturn user.
+/// Username of the [Coturn] user.
+///
+/// [Coturn]: https://github.com/coturn/coturn
 #[derive(Clone, Debug, Display, Eq, Hash, PartialEq)]
 #[display(fmt = "{}_{}", room_id, peer_id)]
 pub struct CoturnUsername {

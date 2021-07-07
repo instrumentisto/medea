@@ -62,12 +62,10 @@ impl Default for IceUsers {
 /// Credentials on Turn server.
 #[derive(Debug, From)]
 pub enum IceUser {
-    /// [ICE] user on [Coturn] [TURN]/[STUN] server.
+    /// [ICE] user on the [Coturn] server.
     ///
     /// [ICE]: https://webrtcglossary.com/ice/
     /// [Coturn]: https://github.com/coturn/coturn
-    /// [TURN]: https://webrtcglossary.com/turn/
-    /// [STUN]: https://webrtcglossary.com/stun/
     Coturn(CoturnIceUser),
 
     /// Static [ICE] user on some [TURN]/[STUN] server.

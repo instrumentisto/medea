@@ -15,11 +15,10 @@ All user visible changes to this project will be documented in this file. This p
 
 - Configuration:
   - Move `[turn]` section to `[turn.coturn]` ([#211]).
-    
+  - Add mandatory `turn.mode` option to configure ICE servers configuration mode ([Coturn] or static servers list) ([#211]);
 ### Added
 - Configuration:
-    - `turn.is_static` option to configure [TURN]/[STUN] server mode ([#211]);
-    - `[[turn.static]]` option to configure static [TURN]/[STUN] servers credentials ([#211]);
+    - `[[turn.static.servers]]` option to specify static ICE servers list ([#211]);
 
 [#211]: /../../pull/211
 

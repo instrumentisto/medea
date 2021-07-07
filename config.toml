@@ -81,14 +81,16 @@
 [turn]
 # Mode of TURN/STUN server.
 #
-# If true then static TURN/STUN server will be used and Coturn
-# is not required.
+# Available modes:
+# `coturn` - using Coturn. In this case Medea will dynamically create and
+#            cleanup Coturn credentials, kill Coturn connections via admin
+#            CLI, gather allocation traffic information.
+# `static` - all Medea cleints will use the provided static list of ICE
+#            servers.
 #
-# Otherwise, Coturn is strictly required.
-#
-# Env var: MEDEA_TURN__IS_STATIC
+# Env var: MEDEA_TURN__MODE
 # Default:
-#   is_static = false
+#   mode = "coturn"
 
 
 [turn.coturn]
@@ -208,19 +210,19 @@
 
 # List of static STUN/TURN servers credentials.
 #
-# [[turn.static]]
+# [[turn.static.servers]]
 
 # Host of STUN server.
 #
-# address = "stun:stun.l.google.com:19302"
+# urls = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
 
-# Username for authorization.
+# Optional username for authorization.
 #
 # username = "USER"
 
-# Password for authorization.
+# Optional credential for authorization.
 #
-# pass = "PASS"
+# credential = "PASS"
 
 
 

@@ -7,61 +7,51 @@ use redis::ConnectionInfo;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-/// STUN/TURN server settings.
-#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
-#[serde(default)]
-pub struct Turn {
-    /// Mode of [TURN]/[STUN] server.
-    ///
-    /// If `true` then static [TURN]/[STUN] servers will be used and [Coturn]
-    /// is not required.
-    ///
-    /// Otherwise, [Coturn] is strictly required.
-    ///
-    /// Defaults to `false`.
-    ///
-    /// [STUN]: https://webrtcglossary.com/stun/
-    /// [TURN]: https://webrtcglossary.com/turn/
-    /// [Coturn]: https://github.com/coturn/coturn
-    #[default = false]
-    pub is_static: bool,
-
-    /// [Coturn] server settings.
-    ///
-    /// Will be used when `is_static` is `false`.
-    ///
-    /// [Coturn]: https://github.com/coturn/coturn
-    pub coturn: Coturn,
-
-    /// Static [TURN]/[STUN] servers configuration.
-    ///
-    /// Will be used when `is_static` is `true`.
-    ///
-    /// [STUN]: https://webrtcglossary.com/stun/
-    /// [TURN]: https://webrtcglossary.com/turn/
-    pub r#static: Vec<StaticCredentials>,
-}
-
-/// Static [TURN]/[STUN] server credentials.
+/// [STUN]/[TURN] servers settings.
 ///
 /// [TURN]: https://webrtcglossary.com/turn/
 /// [STUN]: https://webrtcglossary.com/stun/
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct StaticCredentials {
-    /// Address of [TURN]/[STUN] server.
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(tag = "mode")]
+pub enum Turn {
+    /// Settings for the [Coturn] server.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    #[serde(rename = "coturn")]
+    #[default]
+    Coturn { coturn: Coturn },
+
+    /// Static [TURN]/[STUN] servers list.
     ///
     /// [TURN]: https://webrtcglossary.com/turn/
     /// [STUN]: https://webrtcglossary.com/stun/
-    pub address: String,
-
-    /// Username for authorization.
-    pub username: Option<String>,
-
-    /// Password for authorization.
-    pub pass: Option<String>,
+    #[serde(rename = "static")]
+    Static { r#static: StaticServers },
 }
 
-/// [Coturn] server settings.
+/// [`RtcIceServer`]s list for `static` mode [`Turn`] configuration.
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+pub struct StaticServers {
+    pub servers: Vec<RtcIceServer>,
+}
+
+/// Defines how to connect to the [TURN]/[STUN] server.
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+pub struct RtcIceServer {
+    /// URLs which can be used to connect to the [TURN]/[STUN] server.
+    ///
+    /// [TURN]: https://webrtcglossary.com/turn/
+    /// [STUN]: https://webrtcglossary.com/stun/
+    pub urls: Vec<String>,
+
+    /// Username to use during the authentication process.
+    pub username: Option<String>,
+
+    /// The credential to use when logging into the server.
+    pub credential: Option<String>,
+}
+
+/// [Coturn] server settings for `coturn` mode [`Turn`] configuration.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
@@ -269,38 +259,41 @@ mod spec {
     fn redis_db_overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__MODE" => "coturn",
             "MEDEA_TURN__COTURN__DB__REDIS__HOST" => "5.5.5.5",
             "MEDEA_TURN__COTURN__DB__REDIS__PORT" => "1234",
             "MEDEA_TURN__COTURN__DB__REDIS__PASS" => "hellofellow",
             "MEDEA_TURN__COTURN__DB__REDIS__DB_NUMBER" => "10",
             "MEDEA_TURN__COTURN__DB__REDIS__CONNECT_TIMEOUT" => "10s",
         );
+        let default_coturn = if let Turn::Coturn { coturn } = default_conf.turn
+        {
+            coturn
+        } else {
+            unreachable!();
+        };
+        let env_coturn = if let Turn::Coturn { coturn } = env_conf.turn {
+            coturn
+        } else {
+            unreachable!();
+        };
 
+        assert_ne!(default_coturn.db.redis.host, env_coturn.db.redis.host,);
+        assert_ne!(default_coturn.db.redis.port, env_coturn.db.redis.port,);
+        assert_ne!(default_coturn.db.redis.pass, env_coturn.db.redis.pass,);
         assert_ne!(
-            default_conf.turn.coturn.db.redis.host,
-            env_conf.turn.coturn.db.redis.host,
+            default_coturn.db.redis.db_number,
+            env_coturn.db.redis.db_number,
         );
         assert_ne!(
-            default_conf.turn.coturn.db.redis.port,
-            env_conf.turn.coturn.db.redis.port,
-        );
-        assert_ne!(
-            default_conf.turn.coturn.db.redis.pass,
-            env_conf.turn.coturn.db.redis.pass,
-        );
-        assert_ne!(
-            default_conf.turn.coturn.db.redis.db_number,
-            env_conf.turn.coturn.db.redis.db_number,
-        );
-        assert_ne!(
-            default_conf.turn.coturn.db.redis.connect_timeout,
-            env_conf.turn.coturn.db.redis.connect_timeout,
+            default_coturn.db.redis.connect_timeout,
+            env_coturn.db.redis.connect_timeout,
         );
 
-        assert_eq!(env_conf.turn.coturn.db.redis.host, "5.5.5.5");
-        assert_eq!(env_conf.turn.coturn.db.redis.port, 1234);
+        assert_eq!(env_coturn.db.redis.host, "5.5.5.5");
+        assert_eq!(env_coturn.db.redis.port, 1234);
         assert_eq!(
-            env_conf.turn.coturn.db.redis.connect_timeout,
+            env_coturn.db.redis.connect_timeout,
             Duration::from_secs(10),
         );
     }
@@ -310,20 +303,33 @@ mod spec {
     fn overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__MODE" => "coturn",
             "MEDEA_TURN__COTURN__HOST" => "example.com",
             "MEDEA_TURN__COTURN__PORT" => "1234",
             "MEDEA_TURN__COTURN__USER" => "ferris",
             "MEDEA_TURN__COTURN__PASS" => "qwerty",
         );
 
-        assert_ne!(default_conf.turn.coturn.host, env_conf.turn.coturn.host);
-        assert_ne!(default_conf.turn.coturn.port, env_conf.turn.coturn.port);
-        assert_ne!(default_conf.turn.coturn.user, env_conf.turn.coturn.user);
-        assert_ne!(default_conf.turn.coturn.pass, env_conf.turn.coturn.pass);
+        let default_coturn = if let Turn::Coturn { coturn } = default_conf.turn
+        {
+            coturn
+        } else {
+            unreachable!();
+        };
+        let env_coturn = if let Turn::Coturn { coturn } = env_conf.turn {
+            coturn
+        } else {
+            unreachable!();
+        };
 
-        assert_eq!(env_conf.turn.coturn.host, "example.com");
-        assert_eq!(env_conf.turn.coturn.port, 1234);
-        assert_eq!(env_conf.turn.coturn.addr(), "example.com:1234");
+        assert_ne!(default_coturn.host, env_coturn.host);
+        assert_ne!(default_coturn.port, env_coturn.port);
+        assert_ne!(default_coturn.user, env_coturn.user);
+        assert_ne!(default_coturn.pass, env_coturn.pass);
+
+        assert_eq!(default_coturn.host, "example.com");
+        assert_eq!(default_coturn.port, 1234);
+        assert_eq!(default_coturn.addr(), "example.com:1234");
     }
 
     #[test]
@@ -331,27 +337,31 @@ mod spec {
     fn coturn_cli() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__MODE" => "coturn",
             "MEDEA_TURN__COTURN__CLI__HOST" => "4.4.4.4",
             "MEDEA_TURN__COTURN__CLI__PORT" => "1234",
             "MEDEA_TURN__COTURN__CLI__PASS" => "clipass",
         );
 
-        assert_ne!(
-            default_conf.turn.coturn.cli.host,
-            env_conf.turn.coturn.cli.host
-        );
-        assert_ne!(
-            default_conf.turn.coturn.cli.port,
-            env_conf.turn.coturn.cli.port
-        );
-        assert_ne!(
-            default_conf.turn.coturn.cli.pass,
-            env_conf.turn.coturn.cli.pass
-        );
+        let default_coturn = if let Turn::Coturn { coturn } = default_conf.turn
+        {
+            coturn
+        } else {
+            unreachable!();
+        };
+        let env_coturn = if let Turn::Coturn { coturn } = env_conf.turn {
+            coturn
+        } else {
+            unreachable!();
+        };
 
-        assert_eq!(env_conf.turn.coturn.cli.host, "4.4.4.4");
-        assert_eq!(env_conf.turn.coturn.cli.port, 1234);
-        assert_eq!(env_conf.turn.coturn.cli.pass, "clipass");
+        assert_ne!(default_coturn.cli.host, env_coturn.cli.host);
+        assert_ne!(default_coturn.cli.port, env_coturn.cli.port);
+        assert_ne!(default_coturn.cli.pass, env_coturn.cli.pass);
+
+        assert_eq!(env_coturn.cli.host, "4.4.4.4");
+        assert_eq!(env_coturn.cli.port, 1234);
+        assert_eq!(env_coturn.cli.pass, "clipass");
     }
 
     #[test]
@@ -359,42 +369,46 @@ mod spec {
     fn coturn_cli_pool() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__MODE" => "coturn",
             "MEDEA_TURN__COTURN__CLI__POOL__MAX_SIZE" => "10",
             "MEDEA_TURN__COTURN__CLI__POOL__WAIT_TIMEOUT" => "1s",
             "MEDEA_TURN__COTURN__CLI__POOL__CONNECT_TIMEOUT" => "4s",
             "MEDEA_TURN__COTURN__CLI__POOL__RECYCLE_TIMEOUT" => "3s",
         );
 
+        let default_coturn = if let Turn::Coturn { coturn } = default_conf.turn
+        {
+            coturn
+        } else {
+            unreachable!();
+        };
+        let env_coturn = if let Turn::Coturn { coturn } = env_conf.turn {
+            coturn
+        } else {
+            unreachable!();
+        };
+
         assert_ne!(
-            default_conf.turn.coturn.cli.pool.max_size,
-            env_conf.turn.coturn.cli.pool.max_size,
+            default_coturn.cli.pool.max_size,
+            env_coturn.cli.pool.max_size,
         );
         assert_ne!(
-            default_conf.turn.coturn.cli.pool.wait_timeout,
-            env_conf.turn.coturn.cli.pool.wait_timeout,
+            default_coturn.cli.pool.wait_timeout,
+            env_coturn.cli.pool.wait_timeout,
         );
         assert_ne!(
-            default_conf.turn.coturn.cli.pool.connect_timeout,
-            env_conf.turn.coturn.cli.pool.connect_timeout,
+            default_coturn.cli.pool.connect_timeout,
+            env_coturn.cli.pool.connect_timeout,
         );
         assert_ne!(
-            default_conf.turn.coturn.cli.pool.recycle_timeout,
-            env_conf.turn.coturn.cli.pool.recycle_timeout,
+            default_coturn.cli.pool.recycle_timeout,
+            env_coturn.cli.pool.recycle_timeout,
         );
 
-        assert_eq!(env_conf.turn.coturn.cli.pool.max_size, 10);
-        assert_eq!(
-            env_conf.turn.coturn.cli.pool.wait_timeout,
-            Duration::from_secs(1)
-        );
-        assert_eq!(
-            env_conf.turn.coturn.cli.pool.connect_timeout,
-            Duration::from_secs(4),
-        );
-        assert_eq!(
-            env_conf.turn.coturn.cli.pool.recycle_timeout,
-            Duration::from_secs(3),
-        );
+        assert_eq!(env_coturn.cli.pool.max_size, 10);
+        assert_eq!(env_coturn.cli.pool.wait_timeout, Duration::from_secs(1));
+        assert_eq!(env_coturn.cli.pool.connect_timeout, Duration::from_secs(4));
+        assert_eq!(env_coturn.cli.pool.recycle_timeout, Duration::from_secs(3));
     }
 
     #[test]

@@ -817,7 +817,7 @@ impl<T> Peer<T> {
         &self.context.ice_users
     }
 
-    /// Adds [`IceUser`]s, which is used to generate [`IceServer`]s of this
+    /// Adds [`IceUser`]s, which are used to generate [`IceServer`]s of this
     /// [`Peer`].
     ///
     /// [`IceServer`]: medea_client_api_proto::IceServer

@@ -1,4 +1,4 @@
-//! Representation of [Coturn]'s user.
+//! Representation of the [Coturn]'s user.
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 
@@ -12,7 +12,7 @@ use crate::{
     utils::{generate_token, MpscOneshotSender},
 };
 
-/// Username for authorization on [Coturn] server.
+/// Username for authorization on the [Coturn] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(AsRef, Clone, Debug, Display, Eq, From, Into, PartialEq)]
@@ -27,14 +27,14 @@ impl IceUsername {
     }
 }
 
-/// Password for authorization on [Coturn] server.
+/// Password for authorization on the [Coturn] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(AsRef, Clone, Debug, Display)]
 pub struct IcePassword(String);
 
 impl IcePassword {
-    /// Length of an [`IcePassword`] on [Coturn] server.
+    /// Length of an [`IcePassword`] on the [Coturn] server.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
     pub const LENGTH: usize = 16;
@@ -52,7 +52,7 @@ impl IcePassword {
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(Debug)]
 pub struct CoturnIceUser {
-    /// Address of Turn server.
+    /// Address of the Turn server.
     address: String,
 
     /// Username for authorization.
