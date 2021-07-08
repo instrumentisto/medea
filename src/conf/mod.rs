@@ -1,12 +1,12 @@
 //! Provides application configuration options.
 
 pub mod control;
+pub mod ice;
 pub mod log;
 pub mod media;
 pub mod rpc;
 pub mod server;
 pub mod shutdown;
-pub mod turn;
 
 use std::env;
 
@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
-    control::ControlApi, log::Log, media::Media, rpc::Rpc, server::Server,
-    shutdown::Shutdown, turn::Turn,
+    control::ControlApi, ice::Ice, log::Log, media::Media, rpc::Rpc,
+    server::Server, shutdown::Shutdown,
 };
 
 /// CLI argument that is responsible for holding application configuration
@@ -37,8 +37,10 @@ pub struct Conf {
     /// Servers settings.
     pub server: Server,
 
-    /// TURN server settings.
-    pub turn: Turn,
+    /// [ICE] servers settings.
+    ///
+    /// [ICE]: https://webrtcglossary.com/ice
+    pub ice: Ice,
 
     /// Logging settings.
     pub log: Log,
@@ -107,8 +109,8 @@ pub(crate) mod spec {
 
     use super::*;
 
-    /// Macro which overrides environment variables with provided values,
-    /// parses [`Conf`] and finally removes all the overrided variables.
+    /// Macro which overrides environment variables with the provided values,
+    /// parses [`Conf`] and finally removes all the overriden variables.
     ///
     /// # Usage
     ///
@@ -117,14 +119,14 @@ pub(crate) mod spec {
     /// #
     /// let default_conf = Conf::default();
     /// let env_conf = overrided_by_env_conf!(
-    ///        "MEDEA_TURN__HOST" => "example.com",
-    ///        "MEDEA_TURN__PORT" => "1234",
-    ///        "MEDEA_TURN__USER" => "ferris",
-    ///        "MEDEA_TURN__PASS" => "qwerty"
+    ///        "MEDEA_ICE__HOST" => "example.com",
+    ///        "MEDEA_ICE__PORT" => "1234",
+    ///        "MEDEA_ICE__USER" => "ferris",
+    ///        "MEDEA_ICE__PASS" => "qwerty"
     /// );
     ///
-    /// assert_ne!(default_conf.turn.host, env_conf.turn.host);
-    /// assert_ne!(default_conf.turn.port, env_conf.turn.port);
+    /// assert_ne!(default_conf.ice.host, env_conf.ice.host);
+    /// assert_ne!(default_conf.ice.port, env_conf.ice.port);
     /// // ...
     /// ```
     #[macro_export]
@@ -132,6 +134,36 @@ pub(crate) mod spec {
         ($($env:expr => $value:expr),+ $(,)?) => {{
             $(::std::env::set_var($env, $value);)+
             let conf = crate::conf::Conf::parse().unwrap();
+            $(::std::env::remove_var($env);)+
+            conf
+        }};
+    }
+
+    /// Macro which overrides environment variables the with provided values,
+    /// tries to parse [`Conf`] and finally removes all the overriden variables.
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// # use crate::conf::Conf;
+    /// #
+    /// let default_conf = Conf::default();
+    /// let env_conf = try_overrided_by_env_conf!(
+    ///        "MEDEA_ICE__HOST" => "example.com",
+    ///        "MEDEA_ICE__PORT" => "1234",
+    ///        "MEDEA_ICE__USER" => "ferris",
+    ///        "MEDEA_ICE__PASS" => "qwerty"
+    /// ).unwrap();
+    ///
+    /// assert_ne!(default_conf.ice.host, env_conf.ice.host);
+    /// assert_ne!(default_conf.ice.port, env_conf.ice.port);
+    /// // ...
+    /// ```
+    #[macro_export]
+    macro_rules! try_overrided_by_env_conf {
+        ($($env:expr => $value:expr),+ $(,)?) => {{
+            $(::std::env::set_var($env, $value);)+
+            let conf = crate::conf::Conf::parse();
             $(::std::env::remove_var($env);)+
             conf
         }};

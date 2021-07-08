@@ -59,7 +59,7 @@ impl CoturnMetricsService {
     /// [`RedisError`] can be returned if some basic check on the URL is failed.
     #[allow(dead_code)]
     pub fn new(
-        cf: &conf::turn::Coturn,
+        cf: &conf::ice::Coturn,
         peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RedisError> {
         let client = redis::Client::open(ConnectionInfo::from(&cf.db.redis))?;

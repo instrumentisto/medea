@@ -55,8 +55,8 @@ pub struct PeersService {
     /// [`TurnAuthService`] that [`IceUser`]s for the [`Peer`]s from
     /// this [`PeerRepository`] will be created with.
     ///
-    /// [`Peer`]: crate::media::peer::Peer
     /// [`IceUser`]: crate::turn::IceUser
+    /// [`Peer`]: crate::media::peer::Peer
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -530,7 +530,7 @@ impl PeersService {
     ) -> Result<(), RoomError> {
         let ice_users = self
             .turn_service
-            .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
+            .create(self.room_id.clone(), peer_id, UnreachablePolicy::Error)
             .await?;
 
         self.peers.map_peer_by_id_mut(peer_id, move |p| {

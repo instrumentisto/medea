@@ -24,7 +24,7 @@ pub use self::ice_user::{EmptyIceServersListErr, IceUser, IceUsers};
 #[cfg(test)]
 pub use self::test::new_turn_auth_service_mock;
 
-/// Error which can happen in [`TurnAuthService`].
+/// Errors happening in [`TurnAuthService`].
 #[derive(Display, Debug, Fail, From)]
 pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
@@ -38,22 +38,25 @@ pub enum TurnServiceErr {
     TimedOut,
 }
 
-/// Defines [`TurnAuthService`] behaviour if remote database is unreachable
+/// [`TurnAuthService`] behavior when remote database is unreachable.
 #[derive(Debug)]
 pub enum UnreachablePolicy {
-    /// Error will be propagated if request to db fails cause it is
-    /// unreachable.
-    ReturnErr,
+    /// Error will be propagated if request to database fails.
+    Error,
 
-    /// Static member credentials will be returned if request to db fails cause
-    /// it is unreachable.
-    ReturnStatic,
+    /// Static member credentials will be returned if request to database
+    /// fails.
+    Static,
 }
 
-/// Manages Turn server credentials.
+/// Manages [TURN] server credentials.
+///
+/// [TURN]: https://webrtcglossary.com/turn
 #[async_trait]
 pub trait TurnAuthService: fmt::Debug + Send + Sync {
-    /// Generates and registers Turn credentials.
+    /// Generates and registers [TURN] credentials.
+    ///
+    /// [TURN]: https://webrtcglossary.com/turn
     async fn create(
         &self,
         room_id: RoomId,
@@ -62,21 +65,24 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
     ) -> Result<Vec<IceUser>, TurnServiceErr>;
 }
 
-/// Create new instance [`TurnAuthService`].
+/// Create a new instance of [`TurnAuthService`].
 ///
 /// # Errors
 ///
-/// Errors with [`TurnServiceErr::TurnAuthRepoErr`] if authentication in Redis
-/// fails.
+/// Errors with [`TurnServiceErr::TurnAuthRepoErr`] if authentication in [Redis]
+/// database fails.
+///
+/// [Redis]: https://redis.io
 pub fn new_turn_auth_service<'a>(
-    cf: &conf::Turn,
+    cf: &conf::Ice,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
-    if cf.is_static {
-        let static_servers = cf.static_servers.values().cloned().collect();
-        Ok(Arc::new(StaticService::new(static_servers)))
-    } else {
-        Ok(Arc::new(CoturnService::new(&cf.coturn)?))
-    }
+    Ok(match cf.default {
+        conf::ice::Kind::Static => {
+            let static_servers = cf.r#static.values().cloned().collect();
+            Arc::new(StaticService::new(static_servers))
+        }
+        conf::ice::Kind::Coturn => Arc::new(CoturnService::new(&cf.coturn)?),
+    })
 }
 
 #[cfg(test)]

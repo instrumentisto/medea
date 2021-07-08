@@ -14,12 +14,13 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Configuration:
-    - Move `[turn]` section to `[turn.coturn]` ([#211]).
+    - Moved `[turn]` section to `[ice.coturn]` ([#211]).
 
 ### Added
+
 - Configuration:
-    - `turn.is_static` option to configure [TURN]/[STUN] server mode ([#211]);
-    - `[turn.static_servers]` option to configure static [TURN]/[STUN] ICE servers ([#211]);
+    - `ice.default` option to configure default kind of [ICE] servers for use ([#211]);
+    - `[ice.static]` section to configure static list of [STUN]/[TURN] servers for [ICE] ([#211]).
 
 [#211]: /../../pull/211
 
@@ -143,7 +144,8 @@ All user visible changes to this project will be documented in this file. This p
 
 
 [Coturn]: https://github.com/coturn/coturn
+[ICE]: https://webrtcglossary.com/ice
 [Redis]: https://redis.io
 [Semantic Versioning 2.0.0]: https://semver.org
-[STUN]: https://webrtcglossary.com/stun/
-[TURN]: https://webrtcglossary.com/turn/
+[STUN]: https://webrtcglossary.com/stun
+[TURN]: https://webrtcglossary.com/turn

@@ -1,7 +1,7 @@
 //! Service responsible for managing [Coturn] [TURN] server.
 //!
 //! [Coturn]: https://github.com/coturn/coturn
-//! [TURN]: https://webrtcglossary.com/turn/
+//! [TURN]: https://webrtcglossary.com/turn
 
 mod allocation_event;
 mod cli;
@@ -38,18 +38,18 @@ pub use self::{
 #[derive(Clone, Debug, Display, Eq, Hash, PartialEq)]
 #[display(fmt = "{}_{}", room_id, peer_id)]
 pub struct CoturnUsername {
-    /// [`RoomId`] of the Room this Coturn user is created for.
+    /// [`RoomId`] of the `Room` this user is created for.
     pub room_id: RoomId,
 
-    /// [`PeerId`] of the Peer this Coturn user is created for.
+    /// [`PeerId`] of the `Peer` this user is created for.
     pub peer_id: PeerId,
 }
 
-/// [`TurnAuthService`] implementation backed by [Coturn] [TURN]/[STUN] server.
+/// [`TurnAuthService`] implementation backed by [Coturn] [STUN]/[TURN] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
-/// [STUN]: https://webrtcglossary.com/stun/
-/// [TURN]: https://webrtcglossary.com/turn/
+/// [STUN]: https://webrtcglossary.com/stun
+/// [TURN]: https://webrtcglossary.com/turn
 #[derive(Debug)]
 pub struct Service {
     /// Turn credentials repository.
@@ -83,13 +83,15 @@ pub struct Service {
 }
 
 impl Service {
-    /// Create new [`Service`] instance.
+    /// Creates a new [`Service`] instance.
     ///
     /// # Errors
     ///
     /// Errors with [`TurnServiceErr::TurnAuthRepoErr`] if authentication in
-    /// Redis fails.
-    pub fn new(cf: &conf::turn::Coturn) -> Result<Self, TurnServiceErr> {
+    /// [Redis] database fails.
+    ///
+    /// [Redis]: https://redis.io
+    pub fn new(cf: &conf::ice::Coturn) -> Result<Self, TurnServiceErr> {
         let turn_db = TurnDatabase::new(
             cf.db.redis.connect_timeout,
             ConnectionInfo::from(&cf.db.redis),
@@ -140,7 +142,8 @@ impl Service {
         })
     }
 
-    /// Returns [`IceUser`] with static credentials.
+    /// Returns an [`IceUser`] with static credentials.
+    #[inline]
     fn static_user(&self) -> CoturnIceUser {
         CoturnIceUser::new_static(
             self.turn_address.clone(),
@@ -152,8 +155,8 @@ impl Service {
 
 #[async_trait]
 impl TurnAuthService for Service {
-    /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
-    /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
+    /// Generates an [`IceUser`] with saved TURN address, provided [`MemberId`]
+    /// and random password. Inserts created [`IceUser`] into [`TurnDatabase`].
     ///
     /// [`MemberId`]: medea_client_api_proto::MemberId
     async fn create(
@@ -173,8 +176,8 @@ impl TurnAuthService for Service {
         match self.turn_db.insert(&ice_user).await {
             Ok(_) => Ok(vec![ice_user.into()]),
             Err(err) => match policy {
-                UnreachablePolicy::ReturnErr => Err(err.into()),
-                UnreachablePolicy::ReturnStatic => {
+                UnreachablePolicy::Error => Err(err.into()),
+                UnreachablePolicy::Static => {
                     Ok(vec![self.static_user().into()])
                 }
             },

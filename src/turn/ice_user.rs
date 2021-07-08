@@ -1,8 +1,6 @@
-//! Implementation of entity which represents credentials on [TURN]/[STUN]
-//! server.
+//! Entity representing credentials on [ICE] server.
 //!
-//! [TURN]: https://webrtcglossary.com/turn/
-//! [STUN]: https://webrtcglossary.com/stun/
+//! [ICE]: https://webrtcglossary.com/ice
 
 use std::convert::TryFrom;
 
@@ -13,7 +11,7 @@ use crate::turn::static_service::StaticIceUser;
 
 use super::coturn::CoturnIceUser;
 
-/// Error which indicates that [`IceUsers`] is empty.
+/// Error indicating that [`IceUsers`] is empty.
 #[derive(Debug)]
 pub struct EmptyIceServersListErr;
 
@@ -24,14 +22,14 @@ pub struct EmptyIceServersListErr;
 pub struct IceUsers(Vec<IceUser>);
 
 impl IceUsers {
-    /// Returns new empty [`IceUsers`] list.
+    /// Returns a new empty [`IceUsers`] list.
     #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
-    /// Adds provided [`IceUser`]s to this [`IceUsers`] list.
+    /// Adds the provided [`IceUser`]s to this [`IceUsers`] list.
     #[inline]
     pub fn add(&mut self, mut users: Vec<IceUser>) {
         self.0.append(&mut users);
@@ -41,9 +39,6 @@ impl IceUsers {
 impl TryFrom<&IceUsers> for Vec<IceServer> {
     type Error = EmptyIceServersListErr;
 
-    /// Returns vector of [`IceServer`]s if [`IceUsers`] list is not empty.
-    ///
-    /// Otherwise, returns [`EmptyIceServersListErr`].
     fn try_from(value: &IceUsers) -> Result<Self, Self::Error> {
         if value.0.is_empty() {
             Err(EmptyIceServersListErr)
@@ -54,25 +49,28 @@ impl TryFrom<&IceUsers> for Vec<IceServer> {
 }
 
 impl Default for IceUsers {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Credentials on Turn server.
+/// Credentials on [ICE] server.
+///
+/// [ICE]: https://webrtcglossary.com/ice
 #[derive(Debug, From)]
 pub enum IceUser {
-    /// [ICE] user on the [Coturn] server.
+    /// [ICE] user on managed [Coturn] server.
     ///
-    /// [ICE]: https://webrtcglossary.com/ice/
     /// [Coturn]: https://github.com/coturn/coturn
+    /// [ICE]: https://webrtcglossary.com/ice
     Coturn(CoturnIceUser),
 
-    /// Static [ICE] user on some [TURN]/[STUN] server.
+    /// Static [ICE] user on some unmanaged [STUN]/[TURN] server.
     ///
-    /// [ICE]: https://webrtcglossary.com/ice/
-    /// [TURN]: https://webrtcglossary.com/turn/
-    /// [STUN]: https://webrtcglossary.com/stun/
+    /// [ICE]: https://webrtcglossary.com/ice
+    /// [STUN]: https://webrtcglossary.com/stun
+    /// [TURN]: https://webrtcglossary.com/turn
     Static(StaticIceUser),
 }
 
@@ -91,9 +89,10 @@ impl IceUser {
 
 #[cfg(test)]
 impl IceUser {
-    /// Returns new [Coturn] static [`IceUser`] with a provided credentials.
+    /// Returns a new [Coturn] static [`IceUser`] with the provided credentials.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
+    #[must_use]
     pub fn new_coturn_static(
         address: String,
         username: String,

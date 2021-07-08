@@ -1,4 +1,4 @@
-//! Representation of the [Coturn]'s user.
+//! Representation of a [Coturn]'s user.
 //!
 //! [Coturn]: https://github.com/coturn/coturn
 
@@ -12,7 +12,7 @@ use crate::{
     utils::{generate_token, MpscOneshotSender},
 };
 
-/// Username for authorization on the [Coturn] server.
+/// Username for authorization on a [Coturn] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(AsRef, Clone, Debug, Display, Eq, From, Into, PartialEq)]
@@ -20,26 +20,27 @@ use crate::{
 pub struct IceUsername(String);
 
 impl IceUsername {
-    /// Returns new [`IceUsername`] for the provided [`RoomId`] and [`PeerId`].
+    /// Returns a new [`IceUsername`] for the provided [`RoomId`] and
+    /// [`PeerId`].
     #[must_use]
     fn new(room_id: &RoomId, peer_id: PeerId) -> Self {
         Self(format!("{}_{}", room_id, peer_id))
     }
 }
 
-/// Password for authorization on the [Coturn] server.
+/// Password for authorization on a [Coturn] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(AsRef, Clone, Debug, Display)]
 pub struct IcePassword(String);
 
 impl IcePassword {
-    /// Length of an [`IcePassword`] on the [Coturn] server.
+    /// Length of an [`IcePassword`] on a [Coturn] server.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
     pub const LENGTH: usize = 16;
 
-    /// Generates a new random [`IcePassword`] with for the [`IceUser`].
+    /// Generates a new random [`IcePassword`] for an [`IceUser`].
     #[inline]
     #[must_use]
     pub fn generate() -> Self {
@@ -47,7 +48,7 @@ impl IcePassword {
     }
 }
 
-/// Credentials on [Coturn] server.
+/// Credentials of a [Coturn] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(Debug)]
@@ -56,7 +57,7 @@ pub struct CoturnIceUser {
     address: String,
 
     /// Username for authorization.
-    username: IceUsername,
+    user: IceUsername,
 
     /// Password for authorization.
     pass: IcePassword,
@@ -80,7 +81,7 @@ impl CoturnIceUser {
     ) -> Self {
         Self {
             address,
-            username: IceUsername::new(&room_id, peer_id),
+            user: IceUsername::new(&room_id, peer_id),
             pass,
             on_drop: Some(on_drop),
         }
@@ -89,16 +90,16 @@ impl CoturnIceUser {
     /// Build a new static [`IceUser`].
     #[inline]
     #[must_use]
-    pub fn new_static(address: String, username: String, pass: String) -> Self {
+    pub fn new_static(address: String, user: String, pass: String) -> Self {
         Self {
             address,
-            username: IceUsername(username),
+            user: IceUsername(user),
             pass: IcePassword(pass),
             on_drop: None,
         }
     }
 
-    /// Builds a list of [`IceServer`]s of this [`IceUser`].
+    /// Builds a list of [`IceServer`]s for this [`IceUser`].
     #[must_use]
     pub fn servers_list(&self) -> Vec<IceServer> {
         let stun_url = vec![format!("stun:{}", self.address)];
@@ -113,20 +114,20 @@ impl CoturnIceUser {
         ];
         let turn = IceServer {
             urls: turn_urls,
-            username: Some(self.username.to_string()),
+            username: Some(self.user.to_string()),
             credential: Some(self.pass.to_string()),
         };
         vec![stun, turn]
     }
 
-    /// Returns [`IceUsername`] of this [`IceUser`].
+    /// Returns an [`IceUsername`] of this [`IceUser`].
     #[inline]
     #[must_use]
     pub fn user(&self) -> &IceUsername {
-        &self.username
+        &self.user
     }
 
-    /// Returns [`IcePassword`] of this [`IceUser`].
+    /// Returns an [`IcePassword`] of this [`IceUser`].
     #[inline]
     #[must_use]
     pub fn pass(&self) -> &IcePassword {
@@ -137,7 +138,7 @@ impl CoturnIceUser {
 impl Drop for CoturnIceUser {
     fn drop(&mut self) {
         if let Some(tx) = self.on_drop.take() {
-            let name = mem::take(&mut self.username.0);
+            let name = mem::take(&mut self.user.0);
             if let Err(user) = tx.send(IceUsername(name)) {
                 log::warn!("Failed to cleanup IceUser: {}", user);
             }
@@ -162,7 +163,7 @@ mod spec {
             IcePassword::generate(),
             MpscOneshotSender::from(tx),
         );
-        let user_name = user.username.clone();
+        let user_name = user.user.clone();
 
         drop(user);
 
