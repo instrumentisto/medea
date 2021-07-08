@@ -50,7 +50,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
+    convert::{TryFrom, TryInto as _},
     fmt,
     rc::Rc,
 };
@@ -58,9 +58,9 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    state, AudioSettings, Direction, IceCandidate, IceServer, MediaSourceKind,
-    MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, PeerUpdate,
-    Track, TrackId, TrackPatchCommand, TrackPatchEvent, VideoSettings,
+    state, AudioSettings, Direction, IceCandidate, MediaSourceKind, MediaType,
+    MemberId, NegotiationRole, PeerId as Id, PeerId, PeerUpdate, Track,
+    TrackId, TrackPatchCommand, TrackPatchEvent, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -73,7 +73,7 @@ use crate::{
         },
         peers::Counter,
     },
-    turn::IceUser,
+    turn::{IceUser, IceUsers},
 };
 
 /// Subscriber to the events indicating that [`Peer`] was updated.
@@ -172,8 +172,8 @@ impl PeerError {
 #[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
-#[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
-#[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
+#[enum_delegate(pub fn ice_users(&self) -> &IceUsers)]
+#[enum_delegate(pub fn add_ice_users(&mut self, ice_users: Vec<IceUser>))]
 #[enum_delegate(pub fn endpoints(&self) -> Vec<WeakEndpoint>)]
 #[enum_delegate(pub fn add_endpoint(&mut self, endpoint: &Endpoint))]
 #[enum_delegate(
@@ -263,7 +263,7 @@ impl PeerStateMachine {
             senders: self.get_senders_states(),
             receivers: self.get_receivers_states(),
             force_relay: self.is_force_relayed(),
-            ice_servers: self.ice_servers_list().unwrap(),
+            ice_servers: self.ice_users().try_into().unwrap(),
             negotiation_role: self.negotiation_role(),
             local_sdp: self.local_sdp().map(ToOwned::to_owned),
             remote_sdp: self.remote_sdp().map(ToOwned::to_owned),
@@ -415,8 +415,8 @@ pub struct Context {
     /// [`MemberId`] of a partner [`Peer`]'s owner.
     partner_member: MemberId,
 
-    /// [`IceUser`] created for this [`Peer`].
-    ice_user: Option<IceUser>,
+    /// [`IceUser`]s created for this [`Peer`].
+    ice_users: IceUsers,
 
     /// [SDP] offer of this [`Peer`].
     ///
@@ -811,16 +811,19 @@ impl<T> Peer<T> {
         self.context.is_force_relayed
     }
 
-    /// Returns vector of [`IceServer`]s built from this [`Peer`]s [`IceUser`].
+    /// Returns [`IceUsers`] created for this [`Peer`].
     #[inline]
-    pub fn ice_servers_list(&self) -> Option<Vec<IceServer>> {
-        self.context.ice_user.as_ref().map(IceUser::servers_list)
+    pub fn ice_users(&self) -> &IceUsers {
+        &self.context.ice_users
     }
 
-    /// Sets [`IceUser`], which is used to generate [`IceServer`]s
+    /// Adds [`IceUser`]s, which are used to generate [`IceServer`]s of this
+    /// [`Peer`].
+    ///
+    /// [`IceServer`]: medea_client_api_proto::IceServer
     #[inline]
-    pub fn set_ice_user(&mut self, ice_user: IceUser) {
-        self.context.ice_user.replace(ice_user);
+    pub fn add_ice_users(&mut self, ice_users: Vec<IceUser>) {
+        self.context.ice_users.add(ice_users);
     }
 
     /// Returns [`WeakEndpoint`]s for which this [`Peer`] was created.
@@ -1185,7 +1188,7 @@ impl Peer<Stable> {
             member_id,
             partner_peer,
             partner_member,
-            ice_user: None,
+            ice_users: IceUsers::new(),
             local_sdp: None,
             remote_sdp: None,
             receivers: HashMap::new(),
@@ -1592,11 +1595,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
@@ -1630,11 +1633,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
 
         let mut peer = peer.start_as_offerer();
@@ -1680,11 +1683,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1783,11 +1786,11 @@ pub mod tests {
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
         let mut peer = PeerStateMachine::from(peer);
-        peer.set_ice_user(IceUser::new_static(
+        peer.add_ice_users(vec![IceUser::new_coturn_static(
             String::new(),
             String::new(),
             String::new(),
-        ));
+        )]);
         peer.set_initialized();
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
@@ -2080,11 +2083,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
             peer.context.peer_changes_queue = changes;
             peer.commit_scheduled_changes();
@@ -2125,11 +2128,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
 
             peer.context.peer_changes_queue = changes.clone();
@@ -2170,11 +2173,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
 
             peer.context.peer_changes_queue = changes.clone();
@@ -2207,11 +2210,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new_static(
+            peer.add_ice_users(vec![IceUser::new_coturn_static(
                 String::new(),
                 String::new(),
                 String::new(),
-            ));
+            )]);
             peer.set_initialized();
 
             peer

@@ -94,7 +94,7 @@ pub enum RoomError {
 
     /// [`TurnAuthService`] errored to perform an operation.
     ///
-    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
+    /// [`TurnAuthService`]: crate::turn::TurnAuthService
     #[display(fmt = "TurnService errored in Room: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 

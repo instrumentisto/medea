@@ -1,5 +1,7 @@
 //! [`PeerConnectionStateEventsHandler`] implementation for [`Room`].
 
+use std::convert::TryInto as _;
+
 use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
@@ -37,7 +39,7 @@ impl Room {
                 }
             };
 
-        let ice_servers = if let Some(ice_servers) = peer.ice_servers_list() {
+        let ice_servers = if let Ok(ice_servers) = peer.ice_users().try_into() {
             ice_servers
         } else {
             let member_id = peer.member_id().clone();

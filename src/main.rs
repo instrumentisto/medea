@@ -30,7 +30,7 @@ fn main() -> Result<(), Error> {
 
     let sys = System::new();
     sys.block_on(async move {
-        let turn_service = new_turn_auth_service(&config.turn)?;
+        let turn_service = new_turn_auth_service(&config.ice)?;
         let graceful_shutdown =
             GracefulShutdown::new(config.shutdown.timeout).start();
         let app_context = AppContext::new(config.clone(), turn_service);

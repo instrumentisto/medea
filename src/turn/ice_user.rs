@@ -1,170 +1,103 @@
-//! Representation of [Coturn]'s user.
+//! Entity representing credentials on [ICE] server.
 //!
-//! [Coturn]: https://github.com/coturn/coturn
+//! [ICE]: https://webrtcglossary.com/ice
 
-use std::mem;
+use std::convert::TryFrom;
 
-use derive_more::{AsRef, Display, From, Into};
-use medea_client_api_proto::{IceServer, PeerId, RoomId};
+use derive_more::From;
+use medea_client_api_proto::IceServer;
 
-use crate::{
-    log::prelude as log,
-    utils::{generate_token, MpscOneshotSender},
-};
+use crate::turn::static_service::StaticIceUser;
 
-/// Username for authorization on [Coturn] server.
+use super::coturn::CoturnIceUser;
+
+/// Error indicating that [`IceUsers`] is empty.
+#[derive(Debug)]
+pub struct EmptyIceServersListErr;
+
+/// List of [`IceUser`] created for some [`Peer`].
 ///
-/// [Coturn]: https://github.com/coturn/coturn
-#[derive(AsRef, Clone, Debug, Display, Eq, From, Into, PartialEq)]
-#[as_ref(forward)]
-pub struct IceUsername(String);
+/// [`Peer`]: crate::media::peer::Peer
+#[derive(Debug)]
+pub struct IceUsers(Vec<IceUser>);
 
-impl IceUsername {
-    /// Returns new [`IceUsername`] for the provided [`RoomId`] and [`PeerId`].
-    #[must_use]
-    fn new(room_id: &RoomId, peer_id: PeerId) -> Self {
-        Self(format!("{}_{}", room_id, peer_id))
-    }
-}
-
-/// Password for authorization on [Coturn] server.
-///
-/// [Coturn]: https://github.com/coturn/coturn
-#[derive(AsRef, Clone, Debug, Display)]
-pub struct IcePassword(String);
-
-impl IcePassword {
-    /// Length of an [`IcePassword`] on [Coturn] server.
-    ///
-    /// [Coturn]: https://github.com/coturn/coturn
-    pub const LENGTH: usize = 16;
-
-    /// Generates a new random [`IcePassword`] with for the [`IceUser`].
+impl IceUsers {
+    /// Returns a new empty [`IceUsers`] list.
     #[inline]
     #[must_use]
-    pub fn generate() -> Self {
-        Self(generate_token(Self::LENGTH))
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    /// Adds the provided [`IceUser`]s to this [`IceUsers`] list.
+    #[inline]
+    pub fn add(&mut self, mut users: Vec<IceUser>) {
+        self.0.append(&mut users);
     }
 }
 
-/// Credentials on Turn server.
-#[derive(Debug)]
-pub struct IceUser {
-    /// Address of Turn server.
-    address: String,
+impl TryFrom<&IceUsers> for Vec<IceServer> {
+    type Error = EmptyIceServersListErr;
 
-    /// Username for authorization.
-    username: IceUsername,
+    fn try_from(value: &IceUsers) -> Result<Self, Self::Error> {
+        if value.0.is_empty() {
+            Err(EmptyIceServersListErr)
+        } else {
+            Ok(value.0.iter().flat_map(IceUser::servers_list).collect())
+        }
+    }
+}
 
-    /// Password for authorization.
-    pass: IcePassword,
+impl Default for IceUsers {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    /// Sender into which [`IceUsername`] is sent in [`Drop`] implementation.
+/// Credentials on [ICE] server.
+///
+/// [ICE]: https://webrtcglossary.com/ice
+#[derive(Debug, From)]
+pub enum IceUser {
+    /// [ICE] user on managed [Coturn] server.
     ///
-    /// [`None`] if [`IceUser`] is static.
-    on_drop: Option<MpscOneshotSender<IceUsername>>,
+    /// [Coturn]: https://github.com/coturn/coturn
+    /// [ICE]: https://webrtcglossary.com/ice
+    Coturn(CoturnIceUser),
+
+    /// Static [ICE] user on some unmanaged [STUN]/[TURN] server.
+    ///
+    /// [ICE]: https://webrtcglossary.com/ice
+    /// [STUN]: https://webrtcglossary.com/stun
+    /// [TURN]: https://webrtcglossary.com/turn
+    Static(StaticIceUser),
 }
 
 impl IceUser {
-    /// Builds a new non-static [`IceUser`].
-    #[inline]
-    #[must_use]
-    pub fn new_non_static(
-        address: String,
-        room_id: &RoomId,
-        peer_id: PeerId,
-        pass: IcePassword,
-        on_drop: MpscOneshotSender<IceUsername>,
-    ) -> Self {
-        Self {
-            address,
-            username: IceUsername::new(&room_id, peer_id),
-            pass,
-            on_drop: Some(on_drop),
-        }
-    }
-
-    /// Build a new static [`IceUser`].
-    #[inline]
-    #[must_use]
-    pub fn new_static(address: String, username: String, pass: String) -> Self {
-        Self {
-            address,
-            username: IceUsername(username),
-            pass: IcePassword(pass),
-            on_drop: None,
-        }
-    }
-
-    /// Builds a list of [`IceServer`]s of this [`IceUser`].
+    /// Returns [`IceServer`]s of this [`IceUser`].
     #[must_use]
     pub fn servers_list(&self) -> Vec<IceServer> {
-        let stun_url = vec![format!("stun:{}", self.address)];
-        let stun = IceServer {
-            urls: stun_url,
-            username: None,
-            credential: None,
-        };
-        let turn_urls = vec![
-            format!("turn:{}", self.address),
-            format!("turn:{}?transport=tcp", self.address),
-        ];
-        let turn = IceServer {
-            urls: turn_urls,
-            username: Some(self.username.to_string()),
-            credential: Some(self.pass.to_string()),
-        };
-        vec![stun, turn]
-    }
-
-    /// Returns [`IceUsername`] of this [`IceUser`].
-    #[inline]
-    #[must_use]
-    pub fn user(&self) -> &IceUsername {
-        &self.username
-    }
-
-    /// Returns [`IcePassword`] of this [`IceUser`].
-    #[inline]
-    #[must_use]
-    pub fn pass(&self) -> &IcePassword {
-        &self.pass
-    }
-}
-
-impl Drop for IceUser {
-    fn drop(&mut self) {
-        if let Some(tx) = self.on_drop.take() {
-            let name = mem::take(&mut self.username.0);
-            if let Err(user) = tx.send(IceUsername(name)) {
-                log::warn!("Failed to cleanup IceUser: {}", user);
+        match self {
+            Self::Coturn(coturn) => coturn.servers_list(),
+            Self::Static(user) => {
+                vec![user.ice_server()]
             }
         }
     }
 }
 
 #[cfg(test)]
-mod spec {
-    use futures::{channel::mpsc, StreamExt as _};
-
-    use super::*;
-
-    #[actix_rt::test]
-    async fn removes_from_coturn_on_drop() {
-        let (tx, mut rx) = mpsc::unbounded();
-
-        let user = IceUser::new_non_static(
-            String::new(),
-            &RoomId::from("foobar"),
-            PeerId(0),
-            IcePassword::generate(),
-            MpscOneshotSender::from(tx),
-        );
-        let user_name = user.username.clone();
-
-        drop(user);
-
-        assert_eq!(rx.next().await.unwrap(), user_name);
-        assert!(rx.next().await.is_none());
+impl IceUser {
+    /// Returns a new [Coturn] static [`IceUser`] with the provided credentials.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    #[must_use]
+    pub fn new_coturn_static(
+        address: String,
+        username: String,
+        pass: String,
+    ) -> Self {
+        Self::Coturn(CoturnIceUser::new_static(address, username, pass))
     }
 }
