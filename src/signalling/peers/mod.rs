@@ -55,8 +55,8 @@ pub struct PeersService {
     /// [`TurnAuthService`] that [`IceUser`]s for the [`Peer`]s from
     /// this [`PeerRepository`] will be created with.
     ///
+    /// [`IceUser`]: crate::turn::IceUser
     /// [`Peer`]: crate::media::peer::Peer
-    /// [`IceUser`]: crate::turn::ice_user::IceUser
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -449,7 +449,7 @@ impl PeersService {
     ///
     /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
     ///
-    /// [`IceUser`]: crate::turn::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::IceUser
     pub async fn connect_endpoints(
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
@@ -528,13 +528,13 @@ impl PeersService {
         peer_id: PeerId,
         endpoint: &Endpoint,
     ) -> Result<(), RoomError> {
-        let ice_user = self
+        let ice_users = self
             .turn_service
-            .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
+            .create(self.room_id.clone(), peer_id, UnreachablePolicy::Error)
             .await?;
 
         self.peers.map_peer_by_id_mut(peer_id, move |p| {
-            p.set_ice_user(ice_user);
+            p.add_ice_users(ice_users);
             p.set_initialized();
         })?;
 
@@ -946,7 +946,7 @@ mod tests {
         signalling::{
             elements::Member, peers::traffic_watcher::MockPeerTrafficWatcher,
         },
-        turn::service::test::new_turn_auth_service_mock,
+        turn::test::new_turn_auth_service_mock,
     };
 
     use super::{metrics::MockRtcStatsHandler, *};

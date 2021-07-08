@@ -6,6 +6,27 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.3.0] · 2021-??-??
+[0.3.0]: /../../tree/medea-0.3.0
+
+[Diff](/../../compare/medea-0.2.0...medea-0.3.0) | [Milestone](/../../milestone/3) | [Roadmap](/../../issues/182)
+
+### BC Breaks
+
+- Configuration:
+    - Moved `[turn]` section to `[ice.coturn]` ([#211]).
+
+### Added
+
+- Configuration:
+    - `ice.default` option to configure default kind of [ICE] servers for use ([#211]);
+    - `[ice.static]` section to configure static list of [STUN]/[TURN] servers for [ICE] ([#211]).
+
+[#211]: /../../pull/211
+
+
+
+
 ## [0.2.0] · 2021-04-09
 [0.2.0]: /../../tree/medea-0.2.0
 
@@ -123,5 +144,8 @@ All user visible changes to this project will be documented in this file. This p
 
 
 [Coturn]: https://github.com/coturn/coturn
+[ICE]: https://webrtcglossary.com/ice
 [Redis]: https://redis.io
 [Semantic Versioning 2.0.0]: https://semver.org
+[STUN]: https://webrtcglossary.com/stun
+[TURN]: https://webrtcglossary.com/turn

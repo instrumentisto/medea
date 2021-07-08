@@ -297,7 +297,7 @@ impl ParticipantService {
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
     /// deletes all [`IceUser`]s.
     ///
-    /// [`IceUser`]: crate::turn::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::IceUser
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
