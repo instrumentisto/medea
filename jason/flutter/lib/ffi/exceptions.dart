@@ -247,7 +247,7 @@ class MediaSettingsUpdateException implements Exception {
   /// Error message describing the problem.
   late String message;
 
-  /// The reason of why mediaSettings update failed.
+  /// The reason why media settings update failed.
   ///
   /// Possible exception kinds are:
   /// - [StateError] if an underlying `RoomHandle` object has been disposed.
