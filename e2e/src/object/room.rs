@@ -85,6 +85,10 @@ impl MediaSourceKind {
 
 impl Object<Room> {
     /// Joins a [`Room`] with the provided URI.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn join(&self, uri: String) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -105,6 +109,10 @@ impl Object<Room> {
     ///
     /// If the provided `source_kind` is [`None`], then media publishing will be
     /// disabled for all the [`MediaSourceKind`]s.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn disable_media_send(
         &self,
         kind: MediaKind,
@@ -140,6 +148,10 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be
     /// enabled for all the [`MediaSourceKind`]s.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn enable_media_send(
         &self,
         kind: MediaKind,
@@ -175,6 +187,10 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media receiving will be disabled
     /// for all the [`MediaSourceKind`]s.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn disable_remote_media(
         &self,
         kind: MediaKind,
@@ -210,6 +226,10 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media receiving will be enabled
     /// for all the [`MediaSourceKind`]s.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn enable_remote_media(
         &self,
         kind: MediaKind,
@@ -245,6 +265,10 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be muted
     /// for all the [`MediaSourceKind`]s.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn mute_media(
         &self,
         kind: MediaKind,
@@ -280,6 +304,10 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be unmuted
     /// for all the [`MediaSourceKind`]s.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn unmute_media(
         &self,
         kind: MediaKind,
@@ -311,6 +339,10 @@ impl Object<Room> {
     }
 
     /// Returns a [`ConnectionStore`] of this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn connections_store(
         &self,
     ) -> Result<Object<ConnectionStore>, Error> {
@@ -411,6 +443,10 @@ impl Object<Room> {
     /// Returns a [`LocalTrack`]s store of this [`Room`].
     ///
     /// [`LocalTrack`]: crate::object::local_track::LocalTrack
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn local_tracks(
         &self,
     ) -> Result<Object<LocalTracksStore>, Error> {
@@ -423,6 +459,10 @@ impl Object<Room> {
     }
 
     /// Waits for the `Room.on_close()` callback to fire.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_close(&self) -> Result<String, Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -451,6 +491,10 @@ impl Object<Room> {
     /// Waits for the `Room.on_connection_loss()` callback to fire.
     ///
     /// Resolves instantly if WebSocket connection currently is lost.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_connection_loss(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -494,6 +538,10 @@ impl Object<Room> {
 
     /// Enables or disables media type with a `Room.set_local_media_settings()`
     /// function call.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn set_local_media_settings(
         &self,
         video: bool,
@@ -530,6 +578,10 @@ impl Object<Room> {
 
     /// Waits for the `Room.on_failed_local_stream()` callback to fire the
     /// provided number of times.
+    ///
+    /// # Panics
+    ///
+    /// If failed to execute JS statement.
     pub async fn when_failed_local_stream_count(&self, count: u64) {
         self.execute(Statement::new(
             // language=JavaScript
@@ -561,6 +613,10 @@ impl Object<Room> {
     }
 
     /// Removes all local `LocalMediaTrack`s from the JS side.
+    ///
+    /// # Panics
+    ///
+    /// If failed to execute JS statement.
     pub async fn forget_local_tracks(&self) {
         self.execute(Statement::new(
             // language=JavaScript

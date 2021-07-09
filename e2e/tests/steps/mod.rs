@@ -9,13 +9,11 @@ use std::{convert::Infallible, str::FromStr};
 
 use async_recursion::async_recursion;
 use cucumber_rust::given;
-
-use crate::{
-    object::{
-        room::ParsingFailedError, AwaitCompletion, MediaKind, MediaSourceKind,
-    },
-    world::{member::Builder as MemberBuilder, World},
+use medea_e2e::object::{
+    room::ParsingFailedError, AwaitCompletion, MediaKind, MediaSourceKind,
 };
+
+use crate::world::{member::Builder as MemberBuilder, World};
 
 #[allow(clippy::too_many_arguments)]
 #[given(regex = "^(?:room with )?(joined )?member(?:s)? (\\S+)\

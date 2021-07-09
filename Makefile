@@ -614,7 +614,8 @@ endif
 	                    dockerized=$(dockerized) tag=$(tag) debug=$(debug)
 	@make wait.port port=4444
 endif
-	cargo test --test e2e $(if $(call eq,$(only),),,-- -e '$(only)')
+	cargo test -p medea-e2e --test e2e \
+		$(if $(call eq,$(only),),,-- -e '$(only)')
 ifeq ($(up),yes)
 	@make docker.down.e2e
 endif
@@ -770,7 +771,7 @@ docker.down.demo:
 
 docker.down.e2e: down.control
 	@make docker.down.medea dockerized=no
-	docker-compose -f tests/e2e/docker-compose.yml down --rmi=local -v
+	docker-compose -f e2e/tests/docker-compose.yml down --rmi=local -v
 
 
 # Stop Medea media server in Docker Compose environment
@@ -961,13 +962,13 @@ docker-up-e2e-env = RUST_BACKTRACE=1 \
 docker.up.e2e: docker.down.e2e
 	@make build.jason debug=$(debug) dockerized=no
 	env $(docker-up-e2e-env) \
-	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+	docker-compose -f e2e/tests/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		up $(if $(call eq,$(dockerized),yes),\
 		   $(if $(call eq,$(background),yes),-d,--abort-on-container-exit),-d)
 ifeq ($(background),yes)
 ifeq ($(log),yes)
 	env $(docker-up-e2e-env) \
-	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+	docker-compose -f e2e/tests/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		logs -f &
 endif
 endif

@@ -19,6 +19,7 @@ members = [
     "crates/medea-coturn-telnet-client",
     "crates/medea-macro",
     "crates/medea-reactive",
+    "e2e",
     "jason",
     "mock/control-api",
     "proto/client-api",
@@ -95,30 +96,17 @@ actix-codec = "0.4"
 actix-http-test = "=3.0.0-beta.4"
 actix-rt = "2.2"
 actix-service = "2.0"
-async-recursion = "0.3"
 awc = "=3.0.0-beta.7"
-cucumber_rust = { version = "0.8", features = ["macros"] }
 derive_builder = "0.10"
-fantoccini = "0.17"
 function_name = "0.2"
 hyper = { version = "0.14", features = ["server"] }
 lazy_static = "1.4"
-medea-control-api-mock = { path = "mock/control-api" }
 mockall = "0.10"
-once_cell = "1.5"
-reqwest = { version = "0.11", features = ["json"] }
 serial_test = "0.5"
 tempfile = "3.1"
 tokio = { version = "1.5", features = ["fs", "macros", "rt-multi-thread"] }
 tokio-stream = "0.1"
 tokio-util = "0.6"
-uuid = { version = "0.8", features = ["v4"] }
-webdriver = "0.43"
-
-[[test]]
-name = "e2e"
-path = "tests/e2e/main.rs"
-harness = false  # allows Cucumber to print output instead of libtest
 
 [[test]]
 name = "integration"

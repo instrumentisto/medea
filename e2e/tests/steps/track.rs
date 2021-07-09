@@ -1,13 +1,10 @@
 use std::time::Duration;
 
 use cucumber_rust::then;
+use medea_e2e::object::{MediaKind, MediaSourceKind};
 use tokio::time::sleep;
 
-use crate::{
-    object::{MediaKind, MediaSourceKind},
-    steps::parse_media_kinds,
-    world::World,
-};
+use crate::{steps::parse_media_kinds, world::World};
 
 #[then(regex = r"^(\S+) has (\d+) local track(?:s)?$")]
 async fn then_member_has_local_tracks(

@@ -26,6 +26,11 @@ pub struct TracksStore<T>(PhantomData<T>);
 
 impl<T> Object<TracksStore<T>> {
     /// Returns count of tracks stored in this [`TracksStore`].
+    ///
+    /// # Errors
+    ///
+    /// - If failed to execute JS statement.
+    /// - If failed to parse result as [`u64`].
     pub async fn count(&self) -> Result<u64, Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -38,6 +43,10 @@ impl<T> Object<TracksStore<T>> {
     }
 
     /// Waits this [`TracksStore`] to contain `count` tracks.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
         if count == 0 {
             return Ok(());
@@ -74,6 +83,11 @@ impl<T> Object<TracksStore<T>> {
 
     /// Indicates whether this [`TracksStore`] contains a track with the
     /// provided [`MediaKind`] and [`MediaSourceKind`].
+    ///
+    /// # Errors
+    ///
+    /// - If failed to execute JS statement.
+    /// - If failed to parse result as [`bool`].
     pub async fn has_track(
         &self,
         kind: MediaKind,
@@ -126,6 +140,10 @@ impl<T> Object<TracksStore<T>> {
 
     /// Returns a track from this [`TracksStore`] with the provided
     /// [`MediaKind`] and [`MediaSourceKind`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn get_track(
         &self,
         kind: MediaKind,
@@ -184,6 +202,11 @@ impl<T> Object<TracksStore<T>> {
     }
 
     /// Returns count of tracks by the provided `muted` and `stopped` values.
+    ///
+    /// # Errors
+    ///
+    /// - If failed to execute JS statement.
+    /// - If failed to parse result as [`u64`].
     pub async fn count_tracks_by_selector(
         &self,
         muted: bool,

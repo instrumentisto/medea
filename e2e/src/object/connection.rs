@@ -12,6 +12,10 @@ pub struct Connection;
 
 impl Object<Connection> {
     /// Returns a [`RemoteTracksStore`] of this [`Connection`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn tracks_store(
         &self,
     ) -> Result<Object<RemoteTracksStore>, Error> {
@@ -25,6 +29,10 @@ impl Object<Connection> {
 
     /// Returns a [`Future`] resolving when `Connection.on_close()` callback is
     /// fired.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<(), Error> {

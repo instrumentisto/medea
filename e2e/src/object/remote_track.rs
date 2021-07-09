@@ -9,6 +9,10 @@ pub struct RemoteTrack;
 
 impl Object<RemoteTrack> {
     /// Waits for this [`RemoteTrack`] being enabled.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_enabled(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -30,6 +34,10 @@ impl Object<RemoteTrack> {
 
     /// Waits for this [`RemoteTrack`] being disabled, or the
     /// `RemoteMediaTrack.on_disabled()` callback to fire.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_disabled(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -51,6 +59,10 @@ impl Object<RemoteTrack> {
 
     /// Indicates whether this [`RemoteTrack`]'s underlying `MediaStreamTrack`
     /// is disabled.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn disabled(&self) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -64,6 +76,10 @@ impl Object<RemoteTrack> {
 
     /// Waits for the `RemoteMediaTrack.on_disabled()` callback to fire `count`
     /// times.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_on_disabled_fire_count(
         &self,
         count: u64,
@@ -92,6 +108,10 @@ impl Object<RemoteTrack> {
 
     /// Waits for the `RemoteMediaTrack.on_enabled()` callback to fire `count`
     /// times.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_on_enabled_fire_count(
         &self,
         count: u64,
@@ -120,6 +140,10 @@ impl Object<RemoteTrack> {
 
     /// Waits for the `RemoteMediaTrack.on_muted()` callback to fire `count`
     /// times.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_on_muted_fire_count(
         &self,
         count: u64,
@@ -148,6 +172,10 @@ impl Object<RemoteTrack> {
 
     /// Waits for the `RemoteMediaTrack.on_unmuted()` callback to fire `count`
     /// times.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_on_unmuted_fire_count(
         &self,
         count: u64,

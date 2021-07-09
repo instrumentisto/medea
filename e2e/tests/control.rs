@@ -7,8 +7,6 @@ use medea_control_api_mock::{
     proto::{CreateResponse, Element, SingleGetResponse},
 };
 
-use crate::conf;
-
 /// All errors which can happen while working with a Control API.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
@@ -18,14 +16,20 @@ pub enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 /// Client of a Control API.
-pub struct Client(reqwest::Client);
+pub struct Client {
+    inner: reqwest::Client,
+    control_api_address: String,
+}
 
 impl Client {
     /// Returns a new Control API [`Client`].
     #[inline]
     #[must_use]
-    pub fn new() -> Self {
-        Self(reqwest::Client::new())
+    pub fn new(control_api_address: &str) -> Self {
+        Self {
+            inner: reqwest::Client::new(),
+            control_api_address: control_api_address.to_owned(),
+        }
     }
 
     /// Creates the provided media [`Element`] in the provided `path` on a Medea
@@ -36,8 +40,8 @@ impl Client {
         element: Element,
     ) -> Result<CreateResponse> {
         Ok(self
-            .0
-            .post(&get_url(path))
+            .inner
+            .post(&get_url(&self.control_api_address, path))
             .json(&element)
             .send()
             .await?
@@ -47,12 +51,24 @@ impl Client {
 
     /// Deletes a media [`Element`] identified by the provided `path`.
     pub async fn delete(&self, path: &str) -> Result<Response> {
-        Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
+        Ok(self
+            .inner
+            .delete(&get_url(&self.control_api_address, path))
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 
     /// Returns a media [`Element`] identified by the provided `path`.
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
-        Ok(self.0.get(&get_url(path)).send().await?.json().await?)
+        Ok(self
+            .inner
+            .get(&get_url(&self.control_api_address, path))
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 
     /// Applies on a media server the provided media [`Element`] identified by
@@ -63,8 +79,8 @@ impl Client {
         element: Element,
     ) -> Result<CreateResponse> {
         Ok(self
-            .0
-            .put(&get_url(path))
+            .inner
+            .put(&get_url(&self.control_api_address, path))
             .json(&element)
             .send()
             .await?
@@ -78,8 +94,8 @@ impl Client {
     /// Fetches all callbacks received by Control API mock server.
     pub async fn callbacks(&self) -> Result<Vec<CallbackItem>> {
         Ok(self
-            .0
-            .get(&format!("{}/callbacks", *conf::CONTROL_API_ADDR))
+            .inner
+            .get(&format!("{}/callbacks", self.control_api_address))
             .send()
             .await?
             .json()
@@ -89,6 +105,6 @@ impl Client {
 
 /// Returns URL of a media [`Element`] identified by the provided `path`.
 #[must_use]
-fn get_url(path: &str) -> String {
-    format!("{}/control-api/{}", *conf::CONTROL_API_ADDR, path)
+fn get_url(control_api_address: &str, path: &str) -> String {
+    format!("{}/control-api/{}", control_api_address, path)
 }

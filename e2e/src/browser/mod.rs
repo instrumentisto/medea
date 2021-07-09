@@ -15,7 +15,7 @@ use derive_more::{Display, Error, From};
 use serde_json::Value as Json;
 use webdriver::common::WebWindow;
 
-use self::client::WebDriverClient;
+pub use self::client::{WebDriverClient, WebDriverClientBuilder};
 
 #[doc(inline)]
 pub use self::js::Statement;
@@ -105,6 +105,11 @@ impl Window {
     }
 
     /// Executes the provided [`Statement`] in this [`Window`].
+    ///
+    /// # Errors
+    ///
+    /// - If failed to switch to the provided [`WebWindow`].
+    /// - If failed to execute JS statement.
     #[inline]
     pub async fn execute(&self, exec: Statement) -> Result<Json> {
         self.client
@@ -120,13 +125,14 @@ impl Window {
 /// [WebDriver] session will be closed on this object's [`Drop`].
 ///
 /// [WebDriver]: https://w3.org/TR/webdriver
+#[derive(From)]
 pub struct WindowFactory(WebDriverClient);
 
 impl WindowFactory {
-    /// Returns a new [`WindowFactory`].
+    /// Returns a new [`WindowFactory`] from [`WebDriverClient`].
     #[inline]
-    pub async fn new() -> Result<Self> {
-        Ok(Self(WebDriverClient::new().await?))
+    pub async fn new(client: WebDriverClient) -> Self {
+        Self(client)
     }
 
     /// Creates and returns a new [`Window`].
