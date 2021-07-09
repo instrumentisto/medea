@@ -95,10 +95,10 @@ pub enum TrackEvent {
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum LocalMediaError {
-    /// Errors occurring in [`PeerConnection::update_local_stream()`] method.
+    /// Error occurred in [`PeerConnection::update_local_stream()`] method.
     UpdateLocalStreamError(#[js(cause)] UpdateLocalStreamError),
 
-    /// Errors occurring when creating a new [`Sender`].
+    /// Error occurred when creating a new [`Sender`].
     ///
     /// [`Sender`]: sender::Sender
     SenderCreateError(sender::CreateError),

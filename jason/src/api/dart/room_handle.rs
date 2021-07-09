@@ -8,7 +8,8 @@ use crate::{
         utils::{
             c_str_into_string, DartFuture, DartResult, FormatException,
             InternalException, IntoDartFuture as _,
-            MediaStateTransitionException, StateError,
+            MediaSettingsUpdateException, MediaStateTransitionException,
+            StateError,
         },
         DartValueArg, ForeignClass,
     },
@@ -117,23 +118,20 @@ impl From<Traced<ChangeMediaStateError>> for DartError {
     }
 }
 
-impl From<Traced<ConstraintsUpdateError>> for DartError {
+impl From<ConstraintsUpdateError> for DartError {
     #[inline]
-    fn from(_: Traced<ConstraintsUpdateError>) -> Self {
-        // let (err, _) = err.into_parts();
-        //
-        // match err {
-        //     ConstraintsUpdateError::Recovered { .. } => {
-        //         todo!()
-        //     }
-        //     ConstraintsUpdateError::RecoverFailed { .. } => {
-        //         todo!()
-        //     }
-        //     ConstraintsUpdateError::Errored(_) => {
-        //         todo!()
-        //     }
-        // }
-        unimplemented!()
+    fn from(err: ConstraintsUpdateError) -> Self {
+        let message = err.to_string();
+
+        let (err, rolled_back) = match err {
+            ConstraintsUpdateError::Recovered(err) => (err, true),
+            ConstraintsUpdateError::RecoverFailed {
+                recover_reason, ..
+            } => (recover_reason, false),
+            ConstraintsUpdateError::Errored(err) => (err, false),
+        };
+
+        MediaSettingsUpdateException::new(message, err, rolled_back).into()
     }
 }
 
@@ -191,16 +189,13 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
     settings: ptr::NonNull<MediaStreamSettings>,
     stop_first: bool,
     rollback_on_fail: bool,
-) -> DartFuture<Result<(), Traced<ConstraintsUpdateError>>> {
+) -> DartFuture<Result<(), ConstraintsUpdateError>> {
     let this = this.as_ref().clone();
     let settings = settings.as_ref().clone();
 
     async move {
-        // TODO: Remove unwrap when ConstraintsUpdateException bindings will be
-        //       implemented.
         this.set_local_media_settings(settings, stop_first, rollback_on_fail)
-            .await
-            .unwrap();
+            .await?;
         Ok(())
     }
     .into_dart_future()
@@ -606,7 +601,7 @@ mod mock {
             _settings: MediaStreamSettings,
             _stop_first: bool,
             _rollback_on_fail: bool,
-        ) -> Result<(), Traced<ConstraintsUpdateError>> {
+        ) -> Result<(), ConstraintsUpdateError> {
             Ok(())
         }
 

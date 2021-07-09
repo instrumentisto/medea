@@ -40,6 +40,11 @@ void registerFunctions(DynamicLibrary dl) {
       'register_new_internal_exception_caller')(Pointer.fromFunction<
           Handle Function(Pointer<Utf8>, ForeignValue, Pointer<Utf8>)>(
       _newInternalException));
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_new_media_settings_update_exception_caller')(
+      Pointer.fromFunction<
+          Handle Function(Pointer<Utf8>, Pointer<Handle>,
+              Uint8)>(_newMediaSettingsUpdateException));
 }
 
 /// Creates a new [ArgumentError] from the provided invalid [value], its [name]
@@ -98,12 +103,20 @@ Object _newMediaStateTransitionException(
       stacktrace.nativeStringToDartString());
 }
 
-/// Creates a new [InternalException] with the provided error
-/// [message] and [stacktrace].
+/// Creates a new [InternalException] with the provided error [message], error
+/// [cause] and [stacktrace].
 Object _newInternalException(
     Pointer<Utf8> message, ForeignValue cause, Pointer<Utf8> stacktrace) {
   return InternalException(message.nativeStringToDartString(), cause.toDart(),
       stacktrace.nativeStringToDartString());
+}
+
+/// Creates a new [MediaSettingsUpdateException] with the provided error
+/// [message], error [cause] and [rolledBack] property.
+Object _newMediaSettingsUpdateException(
+    Pointer<Utf8> message, Pointer<Handle> cause, int rolledBack) {
+  return MediaSettingsUpdateException(message.nativeStringToDartString(),
+      unboxDartHandle(cause), rolledBack > 0);
 }
 
 /// Exception thrown when local media acquisition fails.
@@ -226,4 +239,31 @@ class InternalException implements Exception {
 
   /// Instantiates a new [InternalException].
   InternalException(this.message, this.cause, this.nativeStackTrace);
+}
+
+/// Exception that might happen when updating local media settings via
+/// `RoomHandle.setLocalMediaSettings`.
+class MediaSettingsUpdateException implements Exception {
+  /// Error message describing the problem.
+  late String message;
+
+  /// The reason of why mediaSettings update failed.
+  ///
+  /// Possible exception kinds are:
+  /// - [StateError] if an underlying `RoomHandle` object has been disposed.
+  /// - [LocalMediaInitException] if a request of platform media devices
+  ///   access failed.
+  /// - [MediaStateTransitionException] if transition is prohibited by tracks
+  ///   configuration or explicitly denied by server.
+  /// - [InternalException] in case of a programmatic error or some unexpected
+  ///   platform component failure.
+  late Object updateException;
+
+  /// Whether media settings were successfully rolled back after new settings
+  /// application failed.
+  late bool rolledBack;
+
+  /// Instantiates a new [MediaSettingsUpdateException].
+  MediaSettingsUpdateException(
+      this.message, this.updateException, this.rolledBack);
 }

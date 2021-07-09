@@ -200,6 +200,8 @@ class RoomHandle {
   /// If recovering from fail state isn't possible then affected media types
   /// will be disabled.
   ///
+  /// Throws a [MediaSettingsUpdateException] if settings could not be updated.
+  ///
   /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
   Future<void> setLocalMediaSettings(
       MediaStreamSettings settings, bool stopFirst, bool rollbackOnFail) async {
@@ -402,9 +404,10 @@ class RoomHandle {
   ///
   /// This might happen in the following cases:
   /// 1. Media server initiates a media request.
-  /// 2. [RoomHandle.enableAudio()]/[RoomHandle.enableVideo()] is called.
+  /// 2. [RoomHandle.enableAudio] or [RoomHandle.enableVideo] call resulted in
+  ///    new media track acquisition.
   /// 3. [MediaStreamSettings] were updated via
-  ///    [RoomHandle.setLocalMediaSettings()] method.
+  ///    [RoomHandle.setLocalMediaSettings] method.
   ///
   /// Throws [StateError] if the underlying [Pointer] has been freed.
   void onLocalTrack(void Function(LocalMediaTrack) f) {

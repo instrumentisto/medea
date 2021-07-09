@@ -5,11 +5,12 @@ use std::{borrow::Cow, ptr};
 use dart_sys::Dart_Handle;
 use derive_more::Into;
 use libc::c_char;
-use tracerr::Trace;
+use tracerr::{Trace, Traced};
 
 use crate::{
     api::dart::{utils::string_into_c_str, DartValue},
     platform,
+    room::ChangeMediaStateError,
 };
 
 /// Pointer to an extern function that returns a new Dart [`ArgumentError`] with
@@ -80,6 +81,15 @@ type NewInternalExceptionCaller = extern "C" fn(
     stacktrace: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
 
+/// Pointer to an extern function that returns a new Dart
+/// [`MediaSettingsUpdateException`] with the provided error `message`, error
+/// `cause` and `rolled_back` property.
+type NewMediaSettingsUpdateExceptionCaller = extern "C" fn(
+    message: ptr::NonNull<c_char>,
+    cause: DartError,
+    rolled_back: u8,
+) -> Dart_Handle;
+
 /// Stores pointer to the [`NewArgumentErrorCaller`] extern function.
 ///
 /// Must be initialized by Dart during FFI initialization phase.
@@ -130,6 +140,14 @@ static mut NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER: Option<
 /// Must be initialized by Dart during FFI initialization phase.
 static mut NEW_INTERNAL_EXCEPTION_CALLER: Option<NewInternalExceptionCaller> =
     None;
+
+/// Stores pointer to the [`NewMediaSettingsUpdateExceptionCaller`] extern
+/// function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER: Option<
+    NewMediaSettingsUpdateExceptionCaller,
+> = None;
 
 /// Registers the provided [`NewArgumentErrorCaller`] as
 /// [`NEW_ARGUMENT_ERROR_CALLER`].
@@ -233,6 +251,19 @@ pub unsafe extern "C" fn register_new_internal_exception_caller(
     f: NewInternalExceptionCaller,
 ) {
     NEW_INTERNAL_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewMediaSettingsUpdateExceptionCaller`] as
+/// [`NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_media_settings_update_exception_caller(
+    f: NewMediaSettingsUpdateExceptionCaller,
+) {
+    NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER = Some(f);
 }
 
 /// An error that can be returned from Rust to Dart.
@@ -604,6 +635,55 @@ impl From<InternalException> for DartError {
                 string_into_c_str(err.message.into_owned()),
                 err.cause.map(DartError::from).into(),
                 string_into_c_str(err.trace.to_string()),
+            ))
+        }
+    }
+}
+
+/// Errors occurring in [`RoomHandle::set_local_media_settings()`][1] method.
+///
+/// It can be converted into a [`DartError`] and passed to Dart.
+///
+/// [1]: crate::api::RoomHandle::set_local_media_settings
+pub struct MediaSettingsUpdateException {
+    /// Error message describing the problem.
+    message: Cow<'static, str>,
+
+    /// Original [`ChangeMediaStateError`] that was encountered while updating
+    /// local media settings.
+    cause: Traced<ChangeMediaStateError>,
+
+    /// Whether media settings were successfully rolled back after new settings
+    /// application failed.
+    rolled_back: bool,
+}
+
+impl MediaSettingsUpdateException {
+    /// Creates a new [`MediaSettingsUpdateException`] from the provided error
+    /// `message`, error `cause` and `rolled_back` property.
+    #[inline]
+    #[must_use]
+    pub fn new<T: Into<Cow<'static, str>>>(
+        message: T,
+        cause: Traced<ChangeMediaStateError>,
+        rolled_back: bool,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            rolled_back,
+            cause,
+        }
+    }
+}
+
+impl From<MediaSettingsUpdateException> for DartError {
+    #[inline]
+    fn from(err: MediaSettingsUpdateException) -> Self {
+        unsafe {
+            Self::new(NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER.unwrap()(
+                string_into_c_str(err.message.into_owned()),
+                err.cause.into(),
+                err.rolled_back as u8,
             ))
         }
     }

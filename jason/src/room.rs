@@ -982,10 +982,7 @@ pub enum ConstraintsUpdateError {
     /// accordingly to the provided recover policy
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
-    Recovered {
-        /// [`ChangeMediaStateError`] due to which recovery has happened.
-        recover_reason: Traced<ChangeMediaStateError>,
-    },
+    Recovered(Traced<ChangeMediaStateError>),
 
     /// New [`MediaStreamSettings`] set failed and state recovering also
     /// failed.
@@ -1018,9 +1015,7 @@ impl ConstraintsUpdateError {
     pub fn recover_reason(&self) -> Option<Traced<ChangeMediaStateError>> {
         match &self {
             Self::RecoverFailed { recover_reason, .. }
-            | Self::Recovered { recover_reason, .. } => {
-                Some(recover_reason.clone())
-            }
+            | Self::Recovered(recover_reason) => Some(recover_reason.clone()),
             Self::Errored(_) => None,
         }
     }
@@ -1054,7 +1049,7 @@ impl ConstraintsUpdateError {
     #[inline]
     #[must_use]
     fn recovered(recover_reason: Traced<ChangeMediaStateError>) -> Self {
-        Self::Recovered { recover_reason }
+        Self::Recovered(recover_reason)
     }
 
     /// Converts this [`ChangeMediaStateError`] to the
@@ -1062,7 +1057,7 @@ impl ConstraintsUpdateError {
     #[must_use]
     fn recovery_failed(self, reason: Traced<ChangeMediaStateError>) -> Self {
         match self {
-            Self::Recovered { recover_reason } => Self::RecoverFailed {
+            Self::Recovered(recover_reason) => Self::RecoverFailed {
                 recover_reason: reason,
                 recover_fail_reasons: vec![recover_reason],
             },
@@ -1354,7 +1349,7 @@ impl InnerRoom {
     }
 
     /// Updates [`MediaState`]s to the provided `states_update` and disables all
-    /// [`Sender`]s which are doesn't have [`local::Track`].
+    /// [`Sender`]s which doesn't have [`local::Track`].
     ///
     /// [`Sender`]: peer::media::Sender
     async fn disable_senders_without_tracks(
@@ -1391,8 +1386,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
-    /// are should be enabled or disabled.
+    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s that
+    /// should be enabled or disabled.
     ///
     /// If `stop_first` set to `true` then affected [`local::Track`]s will be
     /// dropped before new [`MediaStreamSettings`] is applied. This is usually

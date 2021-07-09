@@ -17,8 +17,9 @@ pub use self::{
     err::{
         ArgumentError, DartError, EnumerateDevicesException, FormatException,
         InternalException, LocalMediaInitException,
-        LocalMediaInitExceptionKind, MediaStateTransitionException,
-        RpcClientException, RpcClientExceptionKind, StateError,
+        LocalMediaInitExceptionKind, MediaSettingsUpdateException,
+        MediaStateTransitionException, RpcClientException,
+        RpcClientExceptionKind, StateError,
     },
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},
