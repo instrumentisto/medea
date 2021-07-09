@@ -16,6 +16,10 @@
 !jason/demo/chart/medea-demo/conf/
 !jason/demo/index.html
 
+# E2E tests sources and manifest.
+!e2e/Cargo.toml
+!e2e/src
+
 # Makefile may be used in Dockerfiles.
 !.env
 !Makefile
