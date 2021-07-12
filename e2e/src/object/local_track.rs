@@ -10,6 +10,10 @@ pub struct LocalTrack;
 impl Object<LocalTrack> {
     /// Drops this [`LocalTrack`] and returns `readyState` of the underlying
     /// `MediaStreamTrack`.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn free_and_check(self) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -29,6 +33,10 @@ impl Object<LocalTrack> {
 
     /// Returns `MediaStreamTrack.enabled` status of the underlying
     /// `MediaStreamTrack`.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn muted(&self) -> Result<bool, Error> {
         self.execute(Statement::new(
             // Not a bug, but a naming specific of WebRTC.

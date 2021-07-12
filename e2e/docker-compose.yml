@@ -14,7 +14,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./index.html:/usr/share/nginx/html/index.html:ro
-      - ../../jason/pkg/:/usr/share/nginx/html/pkg/:ro
+      - ../jason/pkg/:/usr/share/nginx/html/pkg/:ro
   medea:
     container_name: ${COMPOSE_PROJECT_NAME}-medea
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
@@ -30,15 +30,15 @@ services:
     command:
       - --log-file=stdout
     volumes:
-      - ../../_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - ../../.cache/coturn/data/:/var/lib/coturn/
+      - ../_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ../.cache/coturn/data/:/var/lib/coturn/
     network_mode: service:frontend
   coturn-db:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
     volumes:
-      - ../../_dev/coturn/redis.conf:/etc/redis.conf:ro
+      - ../_dev/coturn/redis.conf:/etc/redis.conf:ro
     network_mode: service:frontend
   control-api-mock:
     container_name: ${COMPOSE_PROJECT_NAME}-control-api-mock

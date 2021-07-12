@@ -24,7 +24,11 @@ impl Builder for Jason {
 
 impl Object<Jason> {
     /// Returns a new [`Room`] initiated in this [`Jason`] [`Object`].
-    pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
+    pub async fn init_room(&self) -> Result<Object<Room>, Error> {
         self.execute_and_fetch(Statement::new(
             // language=JavaScript
             r#"
@@ -100,6 +104,10 @@ impl Object<Jason> {
     }
 
     /// Closes the provided [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn close_room(&self, room: &Object<Room>) -> Result<(), Error> {
         self.execute(Statement::with_objs(
             // language=JavaScript
@@ -118,6 +126,10 @@ impl Object<Jason> {
 
     /// Drops [`Jason`] API object, so all the related objects (rooms,
     /// connections, streams, etc.) respectively.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn dispose(self) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript

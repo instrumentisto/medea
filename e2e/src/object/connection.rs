@@ -2,7 +2,7 @@
 
 use crate::{
     browser::Statement,
-    object::{tracks_store::RemoteTracksStore, Object},
+    object::{tracks_store, Object},
 };
 
 use super::Error;
@@ -11,10 +11,14 @@ use super::Error;
 pub struct Connection;
 
 impl Object<Connection> {
-    /// Returns a [`RemoteTracksStore`] of this [`Connection`].
+    /// Returns a [`tracks_store::Remote`] of this [`Connection`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn tracks_store(
         &self,
-    ) -> Result<Object<RemoteTracksStore>, Error> {
+    ) -> Result<Object<tracks_store::Remote>, Error> {
         self.execute_and_fetch(Statement::new(
             // language=JavaScript
             r#"async (conn) => conn.tracksStore"#,
@@ -25,6 +29,10 @@ impl Object<Connection> {
 
     /// Returns a [`Future`] resolving when `Connection.on_close()` callback is
     /// fired.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<(), Error> {

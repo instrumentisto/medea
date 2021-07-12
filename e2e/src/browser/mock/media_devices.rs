@@ -34,6 +34,10 @@ impl<'a> MediaDevices<'a> {
     /// Mocks [getUserMedia()][1] requests to return error for the provided
     /// media types.
     ///
+    /// # Panics
+    ///
+    /// If failed to execute JS statement.
+    ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub async fn mock_gum(&self, video: bool, audio: bool) {
         self.0

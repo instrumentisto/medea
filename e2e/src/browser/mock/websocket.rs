@@ -44,6 +44,10 @@ impl<'a> WebSocket<'a> {
     ///
     /// Will fire this `CloseEvent` on every `WebSocket`'s constructor call,
     /// until [`WebSocket::disable_connection_loss()`] will be called.
+    ///
+    /// # Panics
+    ///
+    /// If failed to execute JS statement.
     pub async fn enable_connection_loss(&self, code: u64) {
         self.0
             .execute(Statement::new(
@@ -70,6 +74,10 @@ impl<'a> WebSocket<'a> {
     ///
     /// After this method call, `WebSocket`'s constructor will work the same way
     /// as without mock.
+    ///
+    /// # Panics
+    ///
+    /// If failed to execute JS statement.
     pub async fn disable_connection_loss(&self) {
         self.0
             .execute(Statement::new(

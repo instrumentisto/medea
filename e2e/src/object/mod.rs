@@ -45,6 +45,7 @@ pub enum AwaitCompletion {
 }
 
 /// Pointer to a JS object on a browser's side.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Display)]
 pub struct ObjectPtr(String);
 
@@ -111,6 +112,10 @@ impl<T> Object<T> {
 
     /// Executes the provided [`Statement`] and returns the resulting
     /// [`Object`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn execute_and_fetch<O>(
         &self,
         statement: Statement,
@@ -132,6 +137,11 @@ impl<T> Object<T> {
     }
 
     /// Indicates whether this [`Object`] is `undefined`.
+    ///
+    /// # Errors
+    ///
+    /// - If failed to execute JS statement.
+    /// - If failed to parse result as [`bool`].
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -172,6 +182,10 @@ impl<T> Object<T> {
 
 impl<T: Builder> Object<T> {
     /// Spawns the provided [`Object`] in the provided [`browser::Window`].
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn spawn(
         obj: T,
         window: browser::Window,
