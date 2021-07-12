@@ -16,10 +16,10 @@ use crate::{
 use super::Error;
 
 /// Shortcut for a [`TracksStore`] of [`LocalTrack`]s.
-pub type LocalTracksStore = TracksStore<LocalTrack>;
+pub type Local = TracksStore<LocalTrack>;
 
 /// Shortcut for a [`TracksStore`] of [`RemoteTrack`]s.
-pub type RemoteTracksStore = TracksStore<RemoteTrack>;
+pub type Remote = TracksStore<RemoteTrack>;
 
 /// Store for [`LocalTrack`]s or [`RemoteTrack`]s.
 pub struct TracksStore<T>(PhantomData<T>);

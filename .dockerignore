@@ -18,7 +18,7 @@
 
 # E2E tests sources and manifest.
 !e2e/Cargo.toml
-!e2e/src
+!e2e/src/
 
 # Makefile may be used in Dockerfiles.
 !.env

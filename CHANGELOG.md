@@ -21,14 +21,8 @@ All user visible changes to this project will be documented in this file. This p
 - Configuration:
     - `ice.default` option to configure default kind of [ICE] servers for use ([#211]);
     - `[ice.static]` section to configure static list of [STUN]/[TURN] servers for [ICE] ([#211]).
-    
-### Changed
-
-- Testing:
-    - Move e2e tests to separate `medea-e2e` crate ([#212]).
 
 [#211]: /../../pull/211
-[#212]: /../../pull/212
 
 
 

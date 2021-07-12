@@ -49,6 +49,7 @@ impl From<JsResult> for Result<Json> {
 /// Client for interacting with a browser through a [WebDriver] protocol.
 ///
 /// [WebDriver]: https://w3.org/TR/webdriver
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct WebDriverClient {
     inner: Arc<Mutex<Inner>>,

@@ -771,7 +771,7 @@ docker.down.demo:
 
 docker.down.e2e: down.control
 	@make docker.down.medea dockerized=no
-	docker-compose -f e2e/tests/docker-compose.yml down --rmi=local -v
+	docker-compose -f e2e/docker-compose.yml down --rmi=local -v
 
 
 # Stop Medea media server in Docker Compose environment
@@ -962,13 +962,13 @@ docker-up-e2e-env = RUST_BACKTRACE=1 \
 docker.up.e2e: docker.down.e2e
 	@make build.jason debug=$(debug) dockerized=no
 	env $(docker-up-e2e-env) \
-	docker-compose -f e2e/tests/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+	docker-compose -f e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		up $(if $(call eq,$(dockerized),yes),\
 		   $(if $(call eq,$(background),yes),-d,--abort-on-container-exit),-d)
 ifeq ($(background),yes)
 ifeq ($(log),yes)
 	env $(docker-up-e2e-env) \
-	docker-compose -f e2e/tests/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+	docker-compose -f e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		logs -f &
 endif
 endif

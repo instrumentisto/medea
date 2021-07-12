@@ -9,7 +9,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./index.html:/usr/share/nginx/html/index.html:ro
-      - ../../jason/pkg/:/usr/share/nginx/html/pkg/:ro
+      - ../jason/pkg/:/usr/share/nginx/html/pkg/:ro
     network_mode: host
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn
@@ -18,8 +18,8 @@ services:
     command:
       - --log-file=stdout
     volumes:
-      - ../../_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - ../../.cache/coturn/data/:/var/lib/coturn/
+      - ../_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ../.cache/coturn/data/:/var/lib/coturn/
     network_mode: host
   coturn-db:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
@@ -28,7 +28,7 @@ services:
     #ports:
     #  - "6379:6379"      # coturn redis
     volumes:
-      - ../../_dev/coturn/redis.conf:/etc/redis.conf:ro
+      - ../_dev/coturn/redis.conf:/etc/redis.conf:ro
     network_mode: host
   webdriver:
     container_name: ${COMPOSE_PROJECT_NAME}-webdriver

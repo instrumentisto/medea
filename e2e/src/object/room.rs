@@ -4,10 +4,7 @@ use std::{borrow::Cow, str::FromStr};
 
 use crate::{
     browser::Statement,
-    object::{
-        connections_store::ConnectionStore, tracks_store::LocalTracksStore,
-        Object,
-    },
+    object::{connections_store::ConnectionStore, tracks_store, Object},
 };
 
 use super::{AwaitCompletion, Error};
@@ -440,16 +437,14 @@ impl Object<Room> {
         .await
     }
 
-    /// Returns a [`LocalTrack`]s store of this [`Room`].
-    ///
-    /// [`LocalTrack`]: crate::object::local_track::LocalTrack
+    /// Returns a [`tracks_store::Local`] of this [`Room`].
     ///
     /// # Errors
     ///
     /// If failed to execute JS statement.
     pub async fn local_tracks(
         &self,
-    ) -> Result<Object<LocalTracksStore>, Error> {
+    ) -> Result<Object<tracks_store::Local>, Error> {
         self.execute_and_fetch(Statement::new(
             // language=JavaScript
             r#"async (room) => room.localTracksStore"#,
