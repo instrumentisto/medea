@@ -490,7 +490,7 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
         .into()
 }
 
-/// Sets callback, invoked when a connection with server is lost.
+/// Sets callback, invoked on local media acquisition failures.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_failed_local_media(
     this: ptr::NonNull<RoomHandle>,

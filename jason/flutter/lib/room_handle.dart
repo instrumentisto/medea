@@ -339,9 +339,9 @@ class RoomHandle {
   ///
   /// Throws a [StateError] if the underlying [Pointer] has been freed.
   ///
-  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableVideo] was
-  /// called while enabling or a media server didn't approve this state
-  /// transition.
+  /// Throws a `MediaStateTransitionException` if
+  /// [RoomHandle.disableRemoteAudio] was called while enabling or a media
+  /// server didn't approve this state transition.
   Future<void> enableRemoteAudio() async {
     await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
@@ -350,8 +350,8 @@ class RoomHandle {
   ///
   /// Throws a [StateError] if the underlying [Pointer] has been freed.
   ///
-  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableRemoteAudio] was
-  /// called while disabling or a media server didn't approve this state
+  /// Throws a `MediaStateTransitionException` if [RoomHandle.enableRemoteAudio]
+  /// was called while disabling or a media server didn't approve this state
   /// transition.
   Future<void> disableRemoteAudio() async {
     await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
@@ -361,9 +361,9 @@ class RoomHandle {
   ///
   /// Throws a [StateError] if the underlying [Pointer] has been freed.
   ///
-  /// Throws a `MediaStateTransitionException` if [RoomHandle.disableVideo] was
-  /// called while enabling or a media server didn't approve this state
-  /// transition.
+  /// Throws a `MediaStateTransitionException` if
+  /// [RoomHandle.disableRemoteVideo] was called while enabling or a media
+  /// server didn't approve this state transition.
   Future<void> enableRemoteVideo() async {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
@@ -372,9 +372,9 @@ class RoomHandle {
   ///
   /// Throws a [StateError] if the underlying [Pointer] has been freed.
   ///
-  /// Throws a `MediaStateTransitionException` if [RoomHandle.disableVideo] was
-  /// called while disabling or a media server didn't approve this state
-  /// transition.
+  /// Throws a `MediaStateTransitionException` if
+  /// [RoomHandle.enableRemoteVideo] was called while disabling or a media
+  /// server didn't approve this state transition.
   Future<void> disableRemoteVideo() async {
     await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
