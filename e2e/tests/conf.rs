@@ -58,7 +58,7 @@ env_var!(
 env_var!(
     /// Path to a Cucumber features which should be run.
     FEATURES_PATH
-        || "tests/e2e/features"
+        || "tests/features"
 );
 
 /// Indicator whether tests should run in a headless browser's mode.

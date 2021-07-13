@@ -3,7 +3,7 @@
 
 use crate::{
     browser::Statement,
-    object::{connection::Connection, Object},
+    object::{connection::Connection, Error, Object},
 };
 
 /// Storage for [`Connection`]s thrown by `Room.on_new_connection()` callback.
@@ -13,10 +13,14 @@ impl Object<ConnectionStore> {
     /// Returns a [`Connection`] of the provided remote member.
     ///
     /// Returns [`None`] if it doesn't exist.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn get(
         &self,
         remote_id: String,
-    ) -> Result<Option<Object<Connection>>, super::Error> {
+    ) -> Result<Option<Object<Connection>>, Error> {
         let connection = self
             .execute_and_fetch(Statement::new(
                 // language=JavaScript
@@ -35,10 +39,14 @@ impl Object<ConnectionStore> {
 
     /// Returns a [`Connection`] for the provided remote member, awaiting for it
     /// if it doesn't exists at the moment.
+    ///
+    /// # Errors
+    ///
+    /// If failed to execute JS statement.
     pub async fn wait_for_connection(
         &self,
         remote_id: String,
-    ) -> Result<Object<Connection>, super::Error> {
+    ) -> Result<Object<Connection>, Error> {
         self.execute_and_fetch(Statement::new(
             // language=JavaScript
             r#"

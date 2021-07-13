@@ -14,14 +14,14 @@ use medea_control_api_mock::{
     proto,
     proto::PublishPolicy,
 };
+use medea_e2e::{
+    browser::{self, WebDriverClientBuilder, WindowFactory},
+    object::{self, Jason, MediaKind, MediaSourceKind, Object},
+};
 use tokio::time::interval;
 use uuid::Uuid;
 
-use crate::{
-    browser::{self, WindowFactory},
-    control,
-    object::{self, Jason, MediaKind, MediaSourceKind, Object},
-};
+use crate::{conf, control};
 
 pub use self::member::{Builder as MemberBuilder, Member};
 
@@ -82,7 +82,7 @@ impl cucumber_rust::World for World {
     async fn new() -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
 
-        let control_client = control::Client::new();
+        let control_client = control::Client::new(&conf::CONTROL_API_ADDR);
         control_client
             .create(
                 &room_id,
@@ -96,7 +96,15 @@ impl cucumber_rust::World for World {
         Ok(Self {
             room_id,
             control_client,
-            window_factory: WindowFactory::new().await?,
+            window_factory: WebDriverClientBuilder::new(
+                &conf::WEBDRIVER_ADDR,
+                &conf::FILE_SERVER_HOST,
+            )
+            .headless_firefox(*conf::HEADLESS)
+            .headless_chrome(*conf::HEADLESS)
+            .connect(&conf::FILE_SERVER_HOST)
+            .await?
+            .into(),
             members: HashMap::new(),
             jasons: HashMap::new(),
         })

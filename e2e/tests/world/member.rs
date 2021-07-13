@@ -3,15 +3,15 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use derive_more::{Display, Error, From};
-
-use crate::{
+use medea_e2e::{
     browser::{mock, Window},
-    conf,
     object::{
         self, connections_store::ConnectionStore, AwaitCompletion, MediaKind,
         MediaSourceKind, Object, Room,
     },
 };
+
+use crate::conf;
 
 /// All errors which can happen while working with a [`Member`].
 #[derive(Debug, Display, Error, From)]
