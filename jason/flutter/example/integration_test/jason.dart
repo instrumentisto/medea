@@ -498,4 +498,24 @@ void main() {
     str.free();
     num.free();
   });
+
+  testWidgets('Complex arguments validation', (WidgetTester tester) async {
+    final _muteVideo = dl.lookupFunction<Handle Function(Pointer, ForeignValue),
+        Object Function(Pointer, ForeignValue)>('RoomHandle__mute_video');
+
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    var err;
+    var arg = ForeignValue.fromInt(123);
+    try {
+      await (_muteVideo(room.ptr.getInnerPtr(), arg.ref) as Future);
+    } catch (e) {
+      err = e as ArgumentError;
+    } finally {
+      arg.free();
+    }
+    expect(err.invalidValue, equals(123));
+    expect(err.name, 'kind');
+  });
 }
