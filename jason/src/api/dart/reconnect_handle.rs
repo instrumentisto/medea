@@ -149,10 +149,15 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         let max_delay = u32::try_from(max_delay).map_err(|_| {
             ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
-        // TODO: Remove unwrap when propagating fatal errors from Rust to Dart
-        //       is implemented.
-        let max_elapsed_time_ms = <Option<i64>>::try_from(max_elapsed_time_ms)
-            .unwrap()
+        let max_elapsed_time_ms = Option::<i64>::try_from(max_elapsed_time_ms)
+            .map_err(|err| {
+                let message = err.to_string();
+                ArgumentError::new(
+                    err.into_value(),
+                    "maxElapsedTimeMs",
+                    message,
+                )
+            })?
             .map(|v| {
                 u32::try_from(v).map_err(|_| {
                     ArgumentError::new(v, "maxElapsedTimeMs", "Expected u32")

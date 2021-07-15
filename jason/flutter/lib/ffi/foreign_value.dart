@@ -64,7 +64,7 @@ class ForeignValue extends Struct {
   static Pointer<ForeignValue> fromString(String str) {
     var fVal = calloc<ForeignValue>();
     fVal.ref._tag = 3;
-    fVal.ref._payload.ptr = str.toNativeUtf8();
+    fVal.ref._payload.string = str.toNativeUtf8();
     return fVal;
   }
 

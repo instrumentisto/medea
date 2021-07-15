@@ -1,4 +1,7 @@
-use std::{convert::TryFrom as _, ptr};
+use std::{
+    convert::{TryFrom, TryInto as _},
+    ptr,
+};
 
 use dart_sys::Dart_Handle;
 use tracerr::Traced;
@@ -6,8 +9,8 @@ use tracerr::Traced;
 use crate::{
     api::dart::{
         utils::{
-            c_str_into_string, DartFuture, DartResult, FormatException,
-            InternalException, IntoDartFuture as _,
+            c_str_into_string, ArgumentError, DartFuture, DartResult,
+            FormatException, InternalException, IntoDartFuture as _,
             MediaSettingsUpdateException, MediaStateTransitionException,
             StateError,
         },
@@ -274,16 +277,11 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.mute_video(source_kind).await?;
+        this.mute_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -298,16 +296,11 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.unmute_video(source_kind).await?;
+        this.unmute_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -320,16 +313,11 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.enable_video(source_kind).await?;
+        this.enable_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -342,16 +330,11 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.disable_video(source_kind).await?;
+        this.disable_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -514,6 +497,33 @@ pub unsafe extern "C" fn RoomHandle__free(this: ptr::NonNull<RoomHandle>) {
     drop(RoomHandle::from_ptr(this));
 }
 
+impl TryFrom<DartValueArg<Option<MediaSourceKind>>>
+    for Option<MediaSourceKind>
+{
+    type Error = DartError;
+
+    fn try_from(
+        source_kind: DartValueArg<Option<MediaSourceKind>>,
+    ) -> Result<Self, Self::Error> {
+        Option::<i64>::try_from(source_kind)
+            .map_err(|err| {
+                let message = err.to_string();
+                ArgumentError::new(err.into_value(), "kind", message)
+            })?
+            .map(MediaSourceKind::try_from)
+            .transpose()
+            .map_err(|err| {
+                ArgumentError::new(
+                    err,
+                    "kind",
+                    "could not build `MediaSourceKind` enum from the \
+                    provided value",
+                )
+                .into()
+            })
+    }
+}
+
 #[cfg(feature = "mockable")]
 mod mock {
     use tracerr::Traced;
@@ -587,12 +597,14 @@ mod mock {
             &self,
             cb: platform::Function<DartError>,
         ) -> Result<(), Traced<HandleDetachedError>> {
-            let err = LocalMediaError::UpdateLocalStreamError(
-                UpdateLocalStreamError::InvalidLocalTracks(
-                    TracksRequestError::NoTracks,
-                ),
+            cb.call1(
+                tracerr::new!(LocalMediaError::UpdateLocalStreamError(
+                    UpdateLocalStreamError::InvalidLocalTracks(
+                        TracksRequestError::NoTracks,
+                    ),
+                ))
+                .into(),
             );
-            cb.call1(tracerr::new!(err).into());
             Ok(())
         }
 
