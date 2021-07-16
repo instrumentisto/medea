@@ -353,10 +353,10 @@ impl<T> TryFrom<DartValueArg<T>> for Option<i64> {
 #[derive(Debug, Display)]
 #[display(fmt = "expected `{}`, but got: `{:?}`", expectation, value)]
 pub struct DartValueCastError {
-    /// Expected type description. Like a `String` or an `Option<i64>`.
+    /// Expected type description. Like a [`String`] or an `Option<i64>`.
     expectation: &'static str,
 
-    /// [`DartValue`] that could not be casted.
+    /// [`DartValue`] that cannot be casted.
     value: DartValue,
 }
 

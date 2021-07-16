@@ -74,7 +74,7 @@ type NewMediaStateTransitionExceptionCaller = extern "C" fn(
 ) -> Dart_Handle;
 
 /// Pointer to an extern function that returns a new Dart [`InternalException`]
-/// with the provided error `message` `cause` and `stacktrace`.
+/// with the provided error `message`, `cause` and `stacktrace`.
 type NewInternalExceptionCaller = extern "C" fn(
     message: ptr::NonNull<c_char>,
     cause: DartValue,
@@ -82,8 +82,8 @@ type NewInternalExceptionCaller = extern "C" fn(
 ) -> Dart_Handle;
 
 /// Pointer to an extern function that returns a new Dart
-/// [`MediaSettingsUpdateException`] with the provided error `message`, error
-/// `cause` and `rolled_back` property.
+/// [`MediaSettingsUpdateException`] with the provided error `message`, `cause`
+/// and `rolled_back` property.
 type NewMediaSettingsUpdateExceptionCaller = extern "C" fn(
     message: ptr::NonNull<c_char>,
     cause: DartError,
@@ -660,7 +660,7 @@ pub struct MediaSettingsUpdateException {
 
 impl MediaSettingsUpdateException {
     /// Creates a new [`MediaSettingsUpdateException`] from the provided error
-    /// `message`, error `cause` and `rolled_back` property.
+    /// `message`, `cause` and `rolled_back` property.
     #[inline]
     #[must_use]
     pub fn new<T: Into<Cow<'static, str>>>(

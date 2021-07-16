@@ -251,8 +251,8 @@ class MediaSettingsUpdateException implements Exception {
   ///
   /// Possible exception kinds are:
   /// - [StateError] if an underlying `RoomHandle` object has been disposed.
-  /// - [LocalMediaInitException] if a request of platform media devices
-  ///   access failed.
+  /// - [LocalMediaInitException] if a request of platform media devices access
+  ///   failed.
   /// - [MediaStateTransitionException] if transition is prohibited by tracks
   ///   configuration or explicitly denied by server.
   /// - [InternalException] in case of a programmatic error or some unexpected

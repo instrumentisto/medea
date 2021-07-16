@@ -25,8 +25,8 @@ impl ConstraintsUpdateException {
         self.0.name()
     }
 
-    /// Returns an [`Error`] if this [`ConstraintsUpdateException`]
-    /// represents a `RecoveredException` or a `RecoverFailedException`.
+    /// Returns an [`Error`] if this [`ConstraintsUpdateException`] represents
+    /// a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
     pub fn recover_reason(&self) -> Option<Error> {
