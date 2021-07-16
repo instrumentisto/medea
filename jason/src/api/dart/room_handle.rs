@@ -1,4 +1,7 @@
-use std::{convert::TryFrom as _, ptr};
+use std::{
+    convert::{TryFrom, TryInto as _},
+    ptr,
+};
 
 use dart_sys::Dart_Handle;
 use tracerr::Traced;
@@ -6,12 +9,18 @@ use tracerr::Traced;
 use crate::{
     api::dart::{
         utils::{
-            c_str_into_string, DartFuture, DartResult, FormatException,
-            IntoDartFuture as _, RpcClientException, StateError,
+            c_str_into_string, ArgumentError, DartFuture, DartResult,
+            FormatException, InternalException, IntoDartFuture as _,
+            MediaSettingsUpdateException, MediaStateTransitionException,
+            StateError,
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
+    peer::{
+        media::sender::CreateError, InsertLocalTracksError, LocalMediaError,
+        UpdateLocalStreamError,
+    },
     platform,
     room::{
         ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -49,7 +58,39 @@ impl From<Traced<RoomJoinError>> for DartError {
                 FormatException::new(message).into()
             }
             RoomJoinError::SessionError(err) => {
-                RpcClientException::from(Traced::from_parts(err, trace)).into()
+                Traced::from_parts(err, trace).into()
+            }
+        }
+    }
+}
+
+impl From<Traced<LocalMediaError>> for DartError {
+    fn from(err: Traced<LocalMediaError>) -> Self {
+        use InsertLocalTracksError as IE;
+        use LocalMediaError as ME;
+        use UpdateLocalStreamError as UE;
+
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        match err {
+            ME::UpdateLocalStreamError(err) => match err {
+                UE::CouldNotGetLocalMedia(err) => {
+                    Traced::from_parts(err, trace).into()
+                }
+                UE::InvalidLocalTracks(_)
+                | UE::InsertLocalTracksError(
+                    IE::InvalidMediaTrack | IE::NotEnoughTracks,
+                ) => MediaStateTransitionException::new(message, trace).into(),
+                UE::InsertLocalTracksError(IE::CouldNotInsertLocalTrack(_)) => {
+                    InternalException::new(message, None, trace).into()
+                }
+            },
+            ME::SenderCreateError(CreateError::TransceiverNotFound(_)) => {
+                InternalException::new(message, None, trace).into()
+            }
+            ME::SenderCreateError(CreateError::CannotDisableRequiredSender) => {
+                MediaStateTransitionException::new(message, trace).into()
             }
         }
     }
@@ -58,25 +99,42 @@ impl From<Traced<RoomJoinError>> for DartError {
 impl From<Traced<ChangeMediaStateError>> for DartError {
     #[inline]
     fn from(err: Traced<ChangeMediaStateError>) -> Self {
-        match err.into_inner() {
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        match err {
             ChangeMediaStateError::Detached => {
                 StateError::new("RoomHandle is in detached state.").into()
             }
-            ChangeMediaStateError::InvalidLocalTracks(_)
-            | ChangeMediaStateError::CouldNotGetLocalMedia(_)
-            | ChangeMediaStateError::InsertLocalTracksError(_)
-            | ChangeMediaStateError::ProhibitedState(_)
-            | ChangeMediaStateError::TransitionIntoOppositeState(_) => {
-                todo!()
+            ChangeMediaStateError::CouldNotGetLocalMedia(err) => {
+                Traced::from_parts(err, trace).into()
+            }
+            ChangeMediaStateError::ProhibitedState(_)
+            | ChangeMediaStateError::TransitionIntoOppositeState(_)
+            | ChangeMediaStateError::InvalidLocalTracks(_) => {
+                MediaStateTransitionException::new(message, trace).into()
+            }
+            ChangeMediaStateError::InsertLocalTracksError(_) => {
+                InternalException::new(message, None, trace).into()
             }
         }
     }
 }
 
-impl From<Traced<ConstraintsUpdateError>> for DartError {
+impl From<ConstraintsUpdateError> for DartError {
     #[inline]
-    fn from(_: Traced<ConstraintsUpdateError>) -> Self {
-        todo!()
+    fn from(err: ConstraintsUpdateError) -> Self {
+        let message = err.to_string();
+
+        let (err, rolled_back) = match err {
+            ConstraintsUpdateError::Recovered(err) => (err, true),
+            ConstraintsUpdateError::RecoverFailed {
+                recover_reason, ..
+            } => (recover_reason, false),
+            ConstraintsUpdateError::Errored(err) => (err, false),
+        };
+
+        MediaSettingsUpdateException::new(message, err, rolled_back).into()
     }
 }
 
@@ -134,16 +192,13 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
     settings: ptr::NonNull<MediaStreamSettings>,
     stop_first: bool,
     rollback_on_fail: bool,
-) -> DartFuture<Result<(), Traced<ConstraintsUpdateError>>> {
+) -> DartFuture<Result<(), ConstraintsUpdateError>> {
     let this = this.as_ref().clone();
     let settings = settings.as_ref().clone();
 
     async move {
-        // TODO: Remove unwrap when ConstraintsUpdateException bindings will be
-        //       implemented.
         this.set_local_media_settings(settings, stop_first, rollback_on_fail)
-            .await
-            .unwrap();
+            .await?;
         Ok(())
     }
     .into_dart_future()
@@ -222,16 +277,11 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.mute_video(source_kind).await?;
+        this.mute_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -246,16 +296,11 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.unmute_video(source_kind).await?;
+        this.unmute_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -268,16 +313,11 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.enable_video(source_kind).await?;
+        this.enable_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -290,16 +330,11 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture<Result<(), Traced<ChangeMediaStateError>>> {
-    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
-    //       implemented.
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
-    let source_kind = Option::<i64>::try_from(source_kind)
-        .unwrap()
-        .map(MediaSourceKind::from);
 
     async move {
-        this.disable_video(source_kind).await?;
+        this.disable_video(source_kind.try_into()?).await?;
         Ok(())
     }
     .into_dart_future()
@@ -438,6 +473,19 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
         .into()
 }
 
+/// Sets callback, invoked on local media acquisition failures.
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__on_failed_local_media(
+    this: ptr::NonNull<RoomHandle>,
+    cb: Dart_Handle,
+) -> DartResult {
+    let this = this.as_ref();
+
+    this.on_failed_local_media(platform::Function::new(cb))
+        .map_err(DartError::from)
+        .into()
+}
+
 /// Frees the data behind the provided pointer.
 ///
 /// # Safety
@@ -449,16 +497,44 @@ pub unsafe extern "C" fn RoomHandle__free(this: ptr::NonNull<RoomHandle>) {
     drop(RoomHandle::from_ptr(this));
 }
 
+impl TryFrom<DartValueArg<Option<MediaSourceKind>>>
+    for Option<MediaSourceKind>
+{
+    type Error = DartError;
+
+    fn try_from(
+        source_kind: DartValueArg<Option<MediaSourceKind>>,
+    ) -> Result<Self, Self::Error> {
+        Option::<i64>::try_from(source_kind)
+            .map_err(|err| {
+                let message = err.to_string();
+                ArgumentError::new(err.into_value(), "kind", message)
+            })?
+            .map(MediaSourceKind::try_from)
+            .transpose()
+            .map_err(|err| {
+                ArgumentError::new(
+                    err,
+                    "kind",
+                    "could not build `MediaSourceKind` enum from the \
+                    provided value",
+                )
+                .into()
+            })
+    }
+}
+
 #[cfg(feature = "mockable")]
 mod mock {
     use tracerr::Traced;
 
     use crate::{
         api::{
-            ConnectionHandle, LocalMediaTrack, MediaStreamSettings,
-            ReconnectHandle,
+            dart::utils::DartError, ConnectionHandle, LocalMediaTrack,
+            MediaStreamSettings, ReconnectHandle,
         },
         media::MediaSourceKind,
+        peer::{LocalMediaError, TracksRequestError, UpdateLocalStreamError},
         platform,
         room::{
             ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
@@ -517,19 +593,27 @@ mod mock {
                 .map(drop)
         }
 
-        // pub fn on_failed_local_media(
-        //     &self,
-        //     f: Callback<JasonError>,
-        // ) {
-        //     // Result<(), JasonError>
-        // }
+        pub fn on_failed_local_media(
+            &self,
+            cb: platform::Function<DartError>,
+        ) -> Result<(), Traced<HandleDetachedError>> {
+            cb.call1(
+                tracerr::new!(LocalMediaError::UpdateLocalStreamError(
+                    UpdateLocalStreamError::InvalidLocalTracks(
+                        TracksRequestError::NoTracks,
+                    ),
+                ))
+                .into(),
+            );
+            Ok(())
+        }
 
         pub async fn set_local_media_settings(
             &self,
             _settings: MediaStreamSettings,
             _stop_first: bool,
             _rollback_on_fail: bool,
-        ) -> Result<(), Traced<ConstraintsUpdateError>> {
+        ) -> Result<(), ConstraintsUpdateError> {
             Ok(())
         }
 

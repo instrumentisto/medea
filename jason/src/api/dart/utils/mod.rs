@@ -16,8 +16,10 @@ pub use self::{
     arrays::PtrArray,
     err::{
         ArgumentError, DartError, EnumerateDevicesException, FormatException,
-        LocalMediaInitException, LocalMediaInitExceptionKind,
-        RpcClientException, RpcClientExceptionKind, StateError,
+        InternalException, LocalMediaInitException,
+        LocalMediaInitExceptionKind, MediaSettingsUpdateException,
+        MediaStateTransitionException, RpcClientException,
+        RpcClientExceptionKind, StateError,
     },
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},

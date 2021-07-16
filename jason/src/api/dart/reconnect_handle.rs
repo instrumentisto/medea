@@ -5,11 +5,13 @@ use tracerr::Traced;
 use crate::{
     api::dart::{
         utils::{
-            ArgumentError, DartFuture, IntoDartFuture, RpcClientException,
+            ArgumentError, DartFuture, InternalException, IntoDartFuture,
+            RpcClientException, RpcClientExceptionKind,
         },
         DartValueArg,
     },
-    rpc::ReconnectError,
+    rpc::{rpc_session::ConnectionLostReason, ReconnectError, SessionError},
+    utils::JsCaused as _,
 };
 
 use super::{
@@ -34,8 +36,45 @@ impl From<Traced<ReconnectError>> for DartError {
                 StateError::new("ReconnectHandle is in detached state.").into()
             }
             ReconnectError::Session(err) => {
-                RpcClientException::from(Traced::from_parts(err, trace)).into()
+                Traced::from_parts(err, trace).into()
             }
+        }
+    }
+}
+
+impl From<Traced<SessionError>> for DartError {
+    #[allow(clippy::option_if_let_else)]
+    fn from(err: Traced<SessionError>) -> Self {
+        use ConnectionLostReason as Reason;
+        use RpcClientExceptionKind as Kind;
+        use SessionError as SE;
+
+        let (err, trace) = err.into_parts();
+        let message = err.to_string();
+
+        let mut cause = None;
+        let kind = match err {
+            SE::SessionFinished(_) => Some(Kind::SessionFinished),
+            SE::NoCredentials
+            | SE::SessionUnexpectedlyDropped
+            | SE::NewConnectionInfo => None,
+            SE::RpcClient(err) => {
+                cause = err.js_cause();
+                None
+            }
+            SE::AuthorizationFailed => Some(Kind::AuthorizationFailed),
+            SE::ConnectionLost(reason) => {
+                if let Reason::ConnectError(err) = reason {
+                    cause = err.into_inner().js_cause()
+                };
+                Some(Kind::ConnectionLost)
+            }
+        };
+
+        if let Some(rpc_kind) = kind {
+            RpcClientException::new(rpc_kind, message, cause, trace).into()
+        } else {
+            InternalException::new(message, cause, trace).into()
         }
     }
 }
@@ -110,10 +149,15 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         let max_delay = u32::try_from(max_delay).map_err(|_| {
             ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
-        // TODO: Remove unwrap when propagating fatal errors from Rust to Dart
-        //       is implemented.
-        let max_elapsed_time_ms = <Option<i64>>::try_from(max_elapsed_time_ms)
-            .unwrap()
+        let max_elapsed_time_ms = Option::<i64>::try_from(max_elapsed_time_ms)
+            .map_err(|err| {
+                let message = err.to_string();
+                ArgumentError::new(
+                    err.into_value(),
+                    "maxElapsedTimeMs",
+                    message,
+                )
+            })?
             .map(|v| {
                 u32::try_from(v).map_err(|_| {
                     ArgumentError::new(v, "maxElapsedTimeMs", "Expected u32")
@@ -193,8 +237,8 @@ mod mock {
         cause: Dart_Handle,
     ) -> DartResult {
         let err = RpcClientException::new(
-            RpcClientExceptionKind::InternalError,
-            "RpcClientException::InternalError",
+            RpcClientExceptionKind::ConnectionLost,
+            "RpcClientException::ConnectionLost",
             Some(platform::Error::from(cause)),
             Trace::new(vec![tracerr::new_frame!()]),
         );

@@ -10,8 +10,7 @@ use tracerr::{Trace, Traced};
 use crate::{
     api::dart::{utils::string_into_c_str, DartValue},
     platform,
-    rpc::SessionError,
-    utils::JsCaused as _,
+    room::ChangeMediaStateError,
 };
 
 /// Pointer to an extern function that returns a new Dart [`ArgumentError`] with
@@ -66,6 +65,31 @@ type NewRpcClientExceptionCaller = extern "C" fn(
     stacktrace: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
 
+/// Pointer to an extern function that returns a new Dart
+/// [`MediaStateTransitionException`] with the provided error `message` and
+/// `stacktrace`.
+type NewMediaStateTransitionExceptionCaller = extern "C" fn(
+    message: ptr::NonNull<c_char>,
+    stacktrace: ptr::NonNull<c_char>,
+) -> Dart_Handle;
+
+/// Pointer to an extern function that returns a new Dart [`InternalException`]
+/// with the provided error `message`, `cause` and `stacktrace`.
+type NewInternalExceptionCaller = extern "C" fn(
+    message: ptr::NonNull<c_char>,
+    cause: DartValue,
+    stacktrace: ptr::NonNull<c_char>,
+) -> Dart_Handle;
+
+/// Pointer to an extern function that returns a new Dart
+/// [`MediaSettingsUpdateException`] with the provided error `message`, `cause`
+/// and `rolled_back` property.
+type NewMediaSettingsUpdateExceptionCaller = extern "C" fn(
+    message: ptr::NonNull<c_char>,
+    cause: DartError,
+    rolled_back: u8,
+) -> Dart_Handle;
+
 /// Stores pointer to the [`NewArgumentErrorCaller`] extern function.
 ///
 /// Must be initialized by Dart during FFI initialization phase.
@@ -101,6 +125,28 @@ static mut NEW_ENUMERATE_DEVICES_EXCEPTION_CALLER: Option<
 /// Must be initialized by Dart during FFI initialization phase.
 static mut NEW_RPC_CLIENT_EXCEPTION_CALLER: Option<
     NewRpcClientExceptionCaller,
+> = None;
+
+/// Stores pointer to the [`NewMediaStateTransitionExceptionCaller`] extern
+/// function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER: Option<
+    NewMediaStateTransitionExceptionCaller,
+> = None;
+
+/// Stores pointer to the [`NewInternalExceptionCaller`] extern function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_INTERNAL_EXCEPTION_CALLER: Option<NewInternalExceptionCaller> =
+    None;
+
+/// Stores pointer to the [`NewMediaSettingsUpdateExceptionCaller`] extern
+/// function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER: Option<
+    NewMediaSettingsUpdateExceptionCaller,
 > = None;
 
 /// Registers the provided [`NewArgumentErrorCaller`] as
@@ -179,6 +225,45 @@ pub unsafe extern "C" fn register_new_rpc_client_exception_caller(
     f: NewRpcClientExceptionCaller,
 ) {
     NEW_RPC_CLIENT_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewMediaStateTransitionExceptionCaller`] as
+/// [`NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_media_state_transition_exception_caller(
+    f: NewMediaStateTransitionExceptionCaller,
+) {
+    NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewInternalExceptionCaller`] as
+/// [`NEW_INTERNAL_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_internal_exception_caller(
+    f: NewInternalExceptionCaller,
+) {
+    NEW_INTERNAL_EXCEPTION_CALLER = Some(f);
+}
+
+/// Registers the provided [`NewMediaSettingsUpdateExceptionCaller`] as
+/// [`NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_new_media_settings_update_exception_caller(
+    f: NewMediaSettingsUpdateExceptionCaller,
+) {
+    NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER = Some(f);
 }
 
 /// An error that can be returned from Rust to Dart.
@@ -420,11 +505,6 @@ pub enum RpcClientExceptionKind {
 
     /// RPC session has been finished. This is a terminal state.
     SessionFinished,
-
-    /// Internal error that is not meant to be handled by external users.
-    ///
-    /// This is a programmatic error.
-    InternalError,
 }
 
 /// Exceptions thrown from an RPC client that implements messaging with media
@@ -477,28 +557,134 @@ impl From<RpcClientException> for DartError {
     }
 }
 
-impl From<Traced<SessionError>> for RpcClientException {
-    fn from(err: Traced<SessionError>) -> Self {
-        use RpcClientExceptionKind as Kind;
-        use SessionError as SE;
+/// Exception thrown when the requested media state transition could not be
+/// performed.
+pub struct MediaStateTransitionException {
+    /// Error message describing the problem.
+    message: Cow<'static, str>,
 
-        let (err, trace) = err.into_parts();
-        let message = err.to_string();
+    /// Stacktrace of this [`MediaStateTransitionException`].
+    trace: Trace,
+}
 
-        let mut cause = None;
-        let kind = match err {
-            SE::SessionFinished(_) => Kind::SessionFinished,
-            SE::NoCredentials
-            | SE::SessionUnexpectedlyDropped
-            | SE::NewConnectionInfo => Kind::InternalError,
-            SE::RpcClient(err) => {
-                cause = err.js_cause();
-                Kind::InternalError
-            }
-            SE::AuthorizationFailed => Kind::AuthorizationFailed,
-            SE::ConnectionLost(_) => Kind::ConnectionLost,
-        };
+impl MediaStateTransitionException {
+    /// Creates a new [`MediaStateTransitionException`] from the provided error
+    /// `message` and `trace`.
+    #[inline]
+    #[must_use]
+    pub fn new<T: Into<Cow<'static, str>>>(message: T, trace: Trace) -> Self {
+        Self {
+            message: message.into(),
+            trace,
+        }
+    }
+}
 
-        RpcClientException::new(kind, message, cause, trace)
+impl From<MediaStateTransitionException> for DartError {
+    #[inline]
+    fn from(err: MediaStateTransitionException) -> Self {
+        unsafe {
+            Self::new(NEW_MEDIA_STATE_TRANSITION_EXCEPTION_CALLER.unwrap()(
+                string_into_c_str(err.message.into_owned()),
+                string_into_c_str(err.trace.to_string()),
+            ))
+        }
+    }
+}
+
+/// Jason's internal exception.
+///
+/// This is either a programmatic error or some unexpected platform component
+/// failure that cannot be handled in any way.
+///
+/// It can be converted into a [`DartError`] and passed to Dart.
+pub struct InternalException {
+    /// Error message describing the problem.
+    message: Cow<'static, str>,
+
+    /// [`platform::Error`] that caused this [`RpcClientException`].
+    cause: Option<platform::Error>,
+
+    /// Stacktrace of this [`InternalException`].
+    trace: Trace,
+}
+
+impl InternalException {
+    /// Creates a new [`InternalException`] from the provided error `message`,
+    /// `trace` and an optional `cause`.
+    #[inline]
+    #[must_use]
+    pub fn new<T: Into<Cow<'static, str>>>(
+        message: T,
+        cause: Option<platform::Error>,
+        trace: Trace,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            trace,
+            cause,
+        }
+    }
+}
+
+impl From<InternalException> for DartError {
+    #[inline]
+    fn from(err: InternalException) -> Self {
+        unsafe {
+            Self::new(NEW_INTERNAL_EXCEPTION_CALLER.unwrap()(
+                string_into_c_str(err.message.into_owned()),
+                err.cause.map(DartError::from).into(),
+                string_into_c_str(err.trace.to_string()),
+            ))
+        }
+    }
+}
+
+/// Errors occurring in [`RoomHandle::set_local_media_settings()`][1] method.
+///
+/// It can be converted into a [`DartError`] and passed to Dart.
+///
+/// [1]: crate::api::RoomHandle::set_local_media_settings
+pub struct MediaSettingsUpdateException {
+    /// Error message describing the problem.
+    message: Cow<'static, str>,
+
+    /// Original [`ChangeMediaStateError`] that was encountered while updating
+    /// local media settings.
+    cause: Traced<ChangeMediaStateError>,
+
+    /// Whether media settings were successfully rolled back after new settings
+    /// application failed.
+    rolled_back: bool,
+}
+
+impl MediaSettingsUpdateException {
+    /// Creates a new [`MediaSettingsUpdateException`] from the provided error
+    /// `message`, `cause` and `rolled_back` property.
+    #[inline]
+    #[must_use]
+    pub fn new<T: Into<Cow<'static, str>>>(
+        message: T,
+        cause: Traced<ChangeMediaStateError>,
+        rolled_back: bool,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            rolled_back,
+            cause,
+        }
+    }
+}
+
+impl From<MediaSettingsUpdateException> for DartError {
+    #[inline]
+    fn from(err: MediaSettingsUpdateException) -> Self {
+        unsafe {
+            Self::new(NEW_MEDIA_SETTINGS_UPDATE_EXCEPTION_CALLER.unwrap()(
+                string_into_c_str(err.message.into_owned()),
+                err.cause.into(),
+                err.rolled_back as u8,
+            ))
+        }
     }
 }

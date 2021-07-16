@@ -13,7 +13,6 @@ pub mod device_video_track_constraints;
 pub mod display_video_track_constraints;
 pub mod input_device_info;
 pub mod jason;
-pub mod jason_error;
 pub mod local_media_track;
 pub mod media_manager_handle;
 pub mod media_stream_settings;
@@ -21,13 +20,12 @@ pub mod reconnect_handle;
 pub mod remote_media_track;
 pub mod room_close_reason;
 pub mod room_handle;
-mod unimplemented;
 pub mod utils;
 
 use std::{convert::TryFrom, ffi::c_void, marker::PhantomData, ptr};
 
 use dart_sys::Dart_Handle;
-use derive_more::From;
+use derive_more::Display;
 use libc::c_char;
 
 use crate::{
@@ -42,12 +40,13 @@ pub use self::{
     connection_handle::ConnectionHandle,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
-    input_device_info::InputDeviceInfo, jason::Jason, jason_error::JasonError,
+    input_device_info::InputDeviceInfo, jason::Jason,
     local_media_track::LocalMediaTrack,
     media_manager_handle::MediaManagerHandle,
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
+    utils::DartError as Error,
 };
 
 /// Rust structure having wrapper class in Dart.
@@ -236,10 +235,10 @@ impl<T> TryFrom<DartValueArg<T>> for ptr::NonNull<c_void> {
     fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
         match value.0 {
             DartValue::Ptr(ptr) => Ok(ptr),
-            _ => Err(DartValueCastError(format!(
-                "expected `NonNull<c_void>`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "NonNull<c_void>",
+                value: value.0,
+            }),
         }
     }
 }
@@ -251,10 +250,10 @@ impl<T> TryFrom<DartValueArg<T>> for Option<ptr::NonNull<c_void>> {
         match value.0 {
             DartValue::None => Ok(None),
             DartValue::Ptr(ptr) => Ok(Some(ptr)),
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<NonNull<c_void>>`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "Option<NonNull<c_void>>",
+                value: value.0,
+            }),
         }
     }
 }
@@ -265,10 +264,10 @@ impl TryFrom<DartValueArg<String>> for String {
     fn try_from(value: DartValueArg<String>) -> Result<Self, Self::Error> {
         match value.0 {
             DartValue::String(c_str) => unsafe { Ok(c_str_into_string(c_str)) },
-            _ => Err(DartValueCastError(format!(
-                "expected `String`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "String",
+                value: value.0,
+            }),
         }
     }
 }
@@ -284,10 +283,10 @@ impl TryFrom<DartValueArg<Option<String>>> for Option<String> {
             DartValue::String(c_str) => unsafe {
                 Ok(Some(c_str_into_string(c_str)))
             },
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<String>`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "Option<String>",
+                value: value.0,
+            }),
         }
     }
 }
@@ -298,10 +297,10 @@ impl<T> TryFrom<DartValueArg<T>> for ptr::NonNull<Dart_Handle> {
     fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
         match value.0 {
             DartValue::Handle(c_str) => Ok(c_str),
-            _ => Err(DartValueCastError(format!(
-                "expected `NonNull<Dart_Handle>`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "NonNull<Dart_Handle>",
+                value: value.0,
+            }),
         }
     }
 }
@@ -313,10 +312,10 @@ impl<T> TryFrom<DartValueArg<T>> for Option<ptr::NonNull<Dart_Handle>> {
         match value.0 {
             DartValue::None => Ok(None),
             DartValue::Handle(c_str) => Ok(Some(c_str)),
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<NonNull<Dart_Handle>>`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "Option<NonNull<Dart_Handle>>",
+                value: value.0,
+            }),
         }
     }
 }
@@ -327,10 +326,10 @@ impl<T> TryFrom<DartValueArg<T>> for i64 {
     fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
         match value.0 {
             DartValue::Int(num) => Ok(num),
-            _ => Err(DartValueCastError(format!(
-                "expected `i64`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "i64",
+                value: value.0,
+            }),
         }
     }
 }
@@ -342,26 +341,41 @@ impl<T> TryFrom<DartValueArg<T>> for Option<i64> {
         match value.0 {
             DartValue::None => Ok(None),
             DartValue::Int(num) => Ok(Some(num)),
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<i64>`, actual: `{:?}`",
-                value.0,
-            ))),
+            _ => Err(DartValueCastError {
+                expectation: "Option<i64>",
+                value: value.0,
+            }),
         }
     }
 }
 
 /// Error of converting a [`DartValue`] to the concrete type.
-#[derive(Debug, From)]
-#[from(forward)]
-pub struct DartValueCastError(String);
+#[derive(Debug, Display)]
+#[display(fmt = "expected `{}`, but got: `{:?}`", expectation, value)]
+pub struct DartValueCastError {
+    /// Expected type description. Like a [`String`] or an `Option<i64>`.
+    expectation: &'static str,
 
-impl From<i64> for MediaSourceKind {
+    /// [`DartValue`] that cannot be casted.
+    value: DartValue,
+}
+
+impl DartValueCastError {
+    /// Returns [`DartValue`] that could not be casted.
+    fn into_value(self) -> DartValue {
+        self.value
+    }
+}
+
+impl TryFrom<i64> for MediaSourceKind {
+    type Error = i64;
+
     #[inline]
-    fn from(value: i64) -> Self {
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
         match value {
-            0 => Self::Device,
-            1 => Self::Display,
-            _ => unreachable!(),
+            0 => Ok(Self::Device),
+            1 => Ok(Self::Display),
+            _ => Err(value),
         }
     }
 }

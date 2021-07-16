@@ -20,7 +20,6 @@ use tracerr::Traced;
 
 use crate::{
     api,
-    api::JasonError,
     connection::Connections,
     media::{
         track::{local, remote},
@@ -29,9 +28,9 @@ use crate::{
     },
     peer::{
         self, media::ProhibitedStateError, media_exchange_state, mute_state,
-        InsertLocalTracksError, LocalStreamUpdateCriteria, MediaState,
-        PeerConnection, PeerEvent, PeerEventHandler, TrackDirection,
-        TracksRequestError, UpdateLocalStreamError,
+        InsertLocalTracksError, LocalMediaError, LocalStreamUpdateCriteria,
+        MediaState, PeerConnection, PeerEvent, PeerEventHandler,
+        TrackDirection, TracksRequestError, UpdateLocalStreamError,
     },
     platform,
     rpc::{
@@ -317,7 +316,7 @@ impl RoomHandle {
     /// See [`HandleDetachedError`] for details.
     pub fn on_failed_local_media(
         &self,
-        f: platform::Function<api::JasonError>,
+        f: platform::Function<api::Error>,
     ) -> Result<(), Traced<HandleDetachedError>> {
         upgrade_inner!(self.0)
             .map(|inner| inner.on_failed_local_media.set_func(f))
@@ -958,7 +957,7 @@ struct InnerRoom {
 
     /// Callback invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_media: Rc<platform::Callback<api::JasonError>>,
+    on_failed_local_media: Rc<platform::Callback<api::Error>>,
 
     /// Callback invoked when a [`RpcSession`] loses connection.
     on_connection_loss: platform::Callback<api::ReconnectHandle>,
@@ -983,10 +982,7 @@ pub enum ConstraintsUpdateError {
     /// accordingly to the provided recover policy
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
-    Recovered {
-        /// [`ChangeMediaStateError`] due to which recovery has happened.
-        recover_reason: Traced<ChangeMediaStateError>,
-    },
+    Recovered(Traced<ChangeMediaStateError>),
 
     /// New [`MediaStreamSettings`] set failed and state recovering also
     /// failed.
@@ -1019,9 +1015,7 @@ impl ConstraintsUpdateError {
     pub fn recover_reason(&self) -> Option<Traced<ChangeMediaStateError>> {
         match &self {
             Self::RecoverFailed { recover_reason, .. }
-            | Self::Recovered { recover_reason, .. } => {
-                Some(recover_reason.clone())
-            }
+            | Self::Recovered(recover_reason) => Some(recover_reason.clone()),
             Self::Errored(_) => None,
         }
     }
@@ -1055,7 +1049,7 @@ impl ConstraintsUpdateError {
     #[inline]
     #[must_use]
     fn recovered(recover_reason: Traced<ChangeMediaStateError>) -> Self {
-        Self::Recovered { recover_reason }
+        Self::Recovered(recover_reason)
     }
 
     /// Converts this [`ChangeMediaStateError`] to the
@@ -1063,7 +1057,7 @@ impl ConstraintsUpdateError {
     #[must_use]
     fn recovery_failed(self, reason: Traced<ChangeMediaStateError>) -> Self {
         match self {
-            Self::Recovered { recover_reason } => Self::RecoverFailed {
+            Self::Recovered(recover_reason) => Self::RecoverFailed {
                 recover_reason: reason,
                 recover_fail_reasons: vec![recover_reason],
             },
@@ -1313,13 +1307,12 @@ impl InnerRoom {
                 .media_manager
                 .get_tracks(req)
                 .await
-                .map_err(tracerr::map_from_and_wrap!())
                 .map_err(|e| {
-                    self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
+                    self.on_failed_local_media.call1(e.clone());
 
                     e
-                })?;
+                })
+                .map_err(tracerr::map_from_and_wrap!())?;
             for (track, is_new) in tracks {
                 if is_new {
                     self.on_local_track
@@ -1356,7 +1349,7 @@ impl InnerRoom {
     }
 
     /// Updates [`MediaState`]s to the provided `states_update` and disables all
-    /// [`Sender`]s which are doesn't have [`local::Track`].
+    /// [`Sender`]s which doesn't have [`local::Track`].
     ///
     /// [`Sender`]: peer::media::Sender
     async fn disable_senders_without_tracks(
@@ -1393,8 +1386,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
-    /// are should be enabled or disabled.
+    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s that
+    /// should be enabled or disabled.
     ///
     /// If `stop_first` set to `true` then affected [`local::Track`]s will be
     /// dropped before new [`MediaStreamSettings`] is applied. This is usually
@@ -1808,8 +1801,11 @@ impl PeerEventHandler for InnerRoom {
 
     /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
     /// `on_failed_local_media` [`Room`]'s callback.
-    async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
-        self.on_failed_local_media.call1(error);
+    async fn on_failed_local_media(
+        &self,
+        error: Traced<LocalMediaError>,
+    ) -> Self::Output {
+        self.on_failed_local_media.call1(api::Error::from(error));
         Ok(())
     }
 
