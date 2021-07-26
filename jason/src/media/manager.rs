@@ -24,7 +24,7 @@ use super::track::local;
 /// Errors returned from the [`MediaManagerHandle::enumerate_devices()`] method.
 #[derive(Clone, Debug, Display, From, JsCaused, Into)]
 #[js(error = "platform::Error")]
-#[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
+#[display(fmt = "MediaDevices.enumerateDevices() failed: {:?}", _0)]
 pub struct EnumerateDevicesError(platform::Error);
 
 /// Errors returned from the [`MediaManagerHandle::init_local_tracks()`] method.
@@ -67,7 +67,7 @@ pub enum GetUserMediaError {
     /// [getUserMedia()][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
+    #[display(fmt = "MediaDevices.getUserMedia() failed: {:?}", _0)]
     PlatformRequestFailed(platform::Error),
 
     /// [`local::Track`] was [`ended`][1] right after [getUserMedia()][2] or
@@ -96,7 +96,7 @@ pub enum GetDisplayMediaError {
     /// [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
+    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {:?}", _0)]
     PlatformRequestFailed(platform::Error),
 
     /// [`local::Track`] was [`ended`][1] right after [getUserMedia()][2] or

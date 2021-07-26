@@ -11,6 +11,7 @@ use crate::{platform, utils::JsCaused};
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
 #[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
+#[display(fmt = "EventTarget.addEventListener() failed: {:?}", _0)]
 pub struct EventListenerBindError(platform::Error);
 
 /// Wrapper for closure that handles some [`EventTarget`] event.
@@ -51,7 +52,7 @@ where
                 event_name,
                 closure.as_ref().unchecked_ref(),
             )
-            .map_err(platform::Error::from)
+            .map_err(platform::error::from)
             .map_err(EventListenerBindError::from)
             .map_err(tracerr::wrap!())?;
 
@@ -82,7 +83,7 @@ where
                 event_name,
                 closure.as_ref().unchecked_ref(),
             )
-            .map_err(platform::Error::from)
+            .map_err(platform::error::from)
             .map_err(EventListenerBindError::from)
             .map_err(tracerr::wrap!())?;
 

@@ -1,23 +1,11 @@
 use std::{convert::TryFrom as _, ptr};
 
-use tracerr::Traced;
-
-use crate::{
-    api::dart::{
-        utils::{
-            ArgumentError, DartFuture, InternalException, IntoDartFuture,
-            RpcClientException, RpcClientExceptionKind,
-        },
-        DartValueArg,
-    },
-    rpc::{rpc_session::ConnectionLostReason, ReconnectError, SessionError},
-    utils::JsCaused as _,
+use crate::api::dart::{
+    utils::{ArgumentError, DartFuture, IntoDartFuture},
+    DartValueArg,
 };
 
-use super::{
-    utils::{DartError, StateError},
-    ForeignClass,
-};
+use super::{utils::DartError, ForeignClass};
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ReconnectHandle;
@@ -25,59 +13,6 @@ pub use self::mock::ReconnectHandle;
 pub use crate::rpc::ReconnectHandle;
 
 impl ForeignClass for ReconnectHandle {}
-
-impl From<Traced<ReconnectError>> for DartError {
-    #[inline]
-    fn from(err: Traced<ReconnectError>) -> Self {
-        let (err, trace) = err.into_parts();
-
-        match err {
-            ReconnectError::Detached => {
-                StateError::new("ReconnectHandle is in detached state.").into()
-            }
-            ReconnectError::Session(err) => {
-                Traced::from_parts(err, trace).into()
-            }
-        }
-    }
-}
-
-impl From<Traced<SessionError>> for DartError {
-    #[allow(clippy::option_if_let_else)]
-    fn from(err: Traced<SessionError>) -> Self {
-        use ConnectionLostReason as Reason;
-        use RpcClientExceptionKind as Kind;
-        use SessionError as SE;
-
-        let (err, trace) = err.into_parts();
-        let message = err.to_string();
-
-        let mut cause = None;
-        let kind = match err {
-            SE::SessionFinished(_) => Some(Kind::SessionFinished),
-            SE::NoCredentials
-            | SE::SessionUnexpectedlyDropped
-            | SE::NewConnectionInfo => None,
-            SE::RpcClient(err) => {
-                cause = err.js_cause();
-                None
-            }
-            SE::AuthorizationFailed => Some(Kind::AuthorizationFailed),
-            SE::ConnectionLost(reason) => {
-                if let Reason::ConnectError(err) = reason {
-                    cause = err.into_inner().js_cause()
-                };
-                Some(Kind::ConnectionLost)
-            }
-        };
-
-        if let Some(rpc_kind) = kind {
-            RpcClientException::new(rpc_kind, message, cause, trace).into()
-        } else {
-            InternalException::new(message, cause, trace).into()
-        }
-    }
-}
 
 /// Tries to reconnect a [`Room`] after the provided delay in milliseconds.
 ///
@@ -196,9 +131,11 @@ mod mock {
     use tracerr::{Trace, Traced};
 
     use crate::{
-        api::dart::utils::{
-            DartError, DartFuture, DartResult, IntoDartFuture as _,
-            RpcClientException, RpcClientExceptionKind,
+        api::{
+            dart::utils::{
+                DartError, DartFuture, DartResult, IntoDartFuture as _,
+            },
+            errors::{RpcClientException, RpcClientExceptionKind},
         },
         platform,
         rpc::{ReconnectError, ReconnectHandle as CoreReconnectHandle},

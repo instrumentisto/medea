@@ -2,18 +2,11 @@ use std::ptr;
 
 use tracerr::Traced;
 
-use crate::media::{
-    EnumerateDevicesError, GetDisplayMediaError, GetUserMediaError,
-    InitLocalTracksError,
-};
+use crate::media::{EnumerateDevicesError, InitLocalTracksError};
 
 use super::{
     media_stream_settings::MediaStreamSettings,
-    utils::{
-        DartError, DartFuture, EnumerateDevicesException, IntoDartFuture,
-        LocalMediaInitException, LocalMediaInitExceptionKind, PtrArray,
-        StateError,
-    },
+    utils::{DartFuture, IntoDartFuture, PtrArray},
     ForeignClass, InputDeviceInfo, LocalMediaTrack,
 };
 
@@ -23,47 +16,6 @@ pub use self::mock::MediaManagerHandle;
 pub use crate::media::MediaManagerHandle;
 
 impl ForeignClass for MediaManagerHandle {}
-
-impl From<Traced<EnumerateDevicesError>> for DartError {
-    #[inline]
-    fn from(err: Traced<EnumerateDevicesError>) -> Self {
-        let (err, stacktrace) = err.into_parts();
-        EnumerateDevicesException::new(err.into(), stacktrace).into()
-    }
-}
-
-impl From<Traced<InitLocalTracksError>> for DartError {
-    fn from(err: Traced<InitLocalTracksError>) -> Self {
-        use GetDisplayMediaError as Gdm;
-        use GetUserMediaError as Gum;
-        use InitLocalTracksError as Err;
-        use LocalMediaInitExceptionKind as Kind;
-
-        let (err, stacktrace) = err.into_parts();
-        let message = err.to_string();
-
-        let (kind, cause) = match err {
-            Err::Detached => {
-                return StateError::new(
-                    "MediaManagerHandle is in detached state.",
-                )
-                .into()
-            }
-            Err::GetUserMediaFailed(Gum::PlatformRequestFailed(cause)) => {
-                (Kind::GetUserMediaFailed, Some(cause))
-            }
-            Err::GetDisplayMediaFailed(Gdm::PlatformRequestFailed(cause)) => {
-                (Kind::GetDisplayMediaFailed, Some(cause))
-            }
-            Err::GetUserMediaFailed(Gum::LocalTrackIsEnded(_))
-            | Err::GetDisplayMediaFailed(Gdm::LocalTrackIsEnded(_)) => {
-                (Kind::LocalTrackIsEnded, None)
-            }
-        };
-
-        LocalMediaInitException::new(kind, message, cause, stacktrace).into()
-    }
-}
 
 /// Returns [`LocalMediaTrack`]s objects, built from the provided
 /// [`MediaStreamSettings`].

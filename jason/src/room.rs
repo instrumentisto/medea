@@ -107,7 +107,7 @@ impl RoomCloseReason {
 #[js(error = "platform::Error")]
 pub enum RoomJoinError {
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "Room is in detached state")]
+    #[display(fmt = "RoomHandle is in detached state")]
     Detached,
 
     /// Returned if the mandatory callback wasn't set.
@@ -137,7 +137,7 @@ pub struct HandleDetachedError;
 #[js(error = "platform::Error")]
 pub enum ChangeMediaStateError {
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "Room is in detached state")]
+    #[display(fmt = "RoomHandle is in detached state")]
     Detached,
 
     /// Validating [`TracksRequest`] doesn't pass.

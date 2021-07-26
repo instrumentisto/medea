@@ -189,7 +189,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j3 up.jason docker.up.medea up.control
+	$(MAKE) -j up.jason docker.up.medea up.control
 
 
 up.medea: docker.up.medea

@@ -1,11 +1,9 @@
 use std::ptr;
 
 use dart_sys::Dart_Handle;
-use tracerr::Traced;
 
 use crate::{
-    api::dart::utils::{DartError, DartResult, StateError},
-    connection::HandlerDetachedError,
+    api::dart::utils::{DartError, DartResult},
     platform,
 };
 
@@ -17,13 +15,6 @@ pub use self::mock::ConnectionHandle;
 pub use crate::connection::ConnectionHandle;
 
 impl ForeignClass for ConnectionHandle {}
-
-impl From<Traced<HandlerDetachedError>> for DartError {
-    #[inline]
-    fn from(_: Traced<HandlerDetachedError>) -> Self {
-        StateError::new("ConnectionHandle is in detached state.").into()
-    }
-}
 
 /// Sets callback, invoked when this `Connection` will close.
 #[no_mangle]
@@ -97,7 +88,7 @@ mod mock {
     use crate::{
         api::RemoteMediaTrack,
         connection::{
-            ConnectionHandle as CoreConnectionHandle, HandlerDetachedError,
+            ConnectionHandle as CoreConnectionHandle, HandleDetachedError,
         },
         platform,
     };
@@ -113,14 +104,14 @@ mod mock {
     impl ConnectionHandle {
         pub fn get_remote_member_id(
             &self,
-        ) -> Result<String, Traced<HandlerDetachedError>> {
-            Err(tracerr::new!(HandlerDetachedError).into())
+        ) -> Result<String, Traced<HandleDetachedError>> {
+            Err(tracerr::new!(HandleDetachedError).into())
         }
 
         pub fn on_close(
             &self,
             f: platform::Function<()>,
-        ) -> Result<(), Traced<HandlerDetachedError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             f.call0();
             Ok(())
         }
@@ -128,7 +119,7 @@ mod mock {
         pub fn on_remote_track_added(
             &self,
             f: platform::Function<RemoteMediaTrack>,
-        ) -> Result<(), Traced<HandlerDetachedError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             f.call1(RemoteMediaTrack);
             Ok(())
         }
@@ -136,7 +127,7 @@ mod mock {
         pub fn on_quality_score_update(
             &self,
             f: platform::Function<u8>,
-        ) -> Result<(), Traced<HandlerDetachedError>> {
+        ) -> Result<(), Traced<HandleDetachedError>> {
             f.call1(4);
             Ok(())
         }

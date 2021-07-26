@@ -56,24 +56,24 @@ pub enum RtcPeerConnectionError {
     /// [RTCPeerConnection][1]'s remote description.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    #[display(fmt = "Failed to add ICE candidate: {}", _0)]
+    #[display(fmt = "Failed to add ICE candidate: {:?}", _0)]
     #[from(ignore)]
     AddIceCandidateFailed(platform::Error),
 
     /// Occurs when cannot obtains [SDP answer][`SdpType::Answer`] from
     /// the underlying [`platform::RtcPeerConnection`].
-    #[display(fmt = "Failed to create SDP answer: {}", _0)]
+    #[display(fmt = "Failed to create SDP answer: {:?}", _0)]
     #[from(ignore)]
     CreateAnswerFailed(platform::Error),
 
     /// Occurs when a new [`platform::RtcPeerConnection`] cannot be created.
-    #[display(fmt = "Failed to create PeerConnection: {}", _0)]
+    #[display(fmt = "Failed to create PeerConnection: {:?}", _0)]
     #[from(ignore)]
     PeerCreationError(platform::Error),
 
     /// Occurs when cannot obtains [SDP offer][`SdpType::Offer`] from
     /// the underlying [`platform::RtcPeerConnection`].
-    #[display(fmt = "Failed to create SDP offer: {}", _0)]
+    #[display(fmt = "Failed to create SDP offer: {:?}", _0)]
     #[from(ignore)]
     CreateOfferFailed(platform::Error),
 
@@ -85,19 +85,19 @@ pub enum RtcPeerConnectionError {
     /// [PeerConnection.getStats][1] promise thrown exception.
     ///
     /// [1]: https://tinyurl.com/w6hmt5f
-    #[display(fmt = "PeerConnection.getStats() failed with error: {}", _0)]
+    #[display(fmt = "PeerConnection.getStats() failed with error: {:?}", _0)]
     #[from(ignore)]
     GetStatsException(platform::Error),
 
     /// Occurs if the local description associated with the
     /// [`platform::RtcPeerConnection`] cannot be changed.
-    #[display(fmt = "Failed to set local SDP description: {}", _0)]
+    #[display(fmt = "Failed to set local SDP description: {:?}", _0)]
     #[from(ignore)]
     SetLocalDescriptionFailed(platform::Error),
 
     /// Occurs if the description of the remote end of the
     /// [`platform::RtcPeerConnection`] cannot be changed.
-    #[display(fmt = "Failed to set remote SDP description: {}", _0)]
+    #[display(fmt = "Failed to set remote SDP description: {:?}", _0)]
     #[from(ignore)]
     SetRemoteDescriptionFailed(platform::Error),
 }

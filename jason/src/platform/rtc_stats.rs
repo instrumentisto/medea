@@ -25,7 +25,7 @@ pub enum RtcStatsError {
     UndefinedStats,
 
     /// Some platform error occurred.
-    #[display(fmt = "Unexpected platform error: {}", _0)]
+    #[display(fmt = "Unexpected platform error: {:?}", _0)]
     Platform(platform::Error),
 
     /// `RTCStats.entries` are undefined.
