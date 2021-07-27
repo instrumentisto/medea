@@ -1,16 +1,16 @@
-//! asdasdasd
+//! Implementations and definitions of the errors which can be returned from the
+//! API functions.
 
 use derive_more::Into;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{convert::IntoWasmAbi, describe::WasmDescribe, prelude::*};
 
 use crate::api::errors::{
     EnumerateDevicesException, FormatException, InternalException,
     LocalMediaInitException, MediaSettingsUpdateException,
     MediaStateTransitionException, RpcClientException, StateError,
 };
-use wasm_bindgen::{convert::IntoWasmAbi, describe::WasmDescribe};
 
-/// asdasd
+/// Wrapper around [`JsValue`] which represents JS error.
 #[derive(Into)]
 pub struct Error(JsValue);
 

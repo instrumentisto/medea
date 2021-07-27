@@ -2047,7 +2047,7 @@ dependencies = [
  "libc",
  "log",
  "medea-client-api-proto 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-macro 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-macro 0.2.1",
  "medea-reactive 0.1.1",
  "mockall",
  "predicates-tree",

@@ -124,18 +124,23 @@ impl LocalMediaInitException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl LocalMediaInitException {
+    /// Returns concrete error kind of this [`LocalMediaInitException`].
     pub fn kind(&self) -> LocalMediaInitExceptionKind {
         self.kind
     }
 
+    /// Returns error message describing the problem.
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
+    /// Returns [`platform::Error`] that caused this
+    /// [`LocalMediaInitException`].
     pub fn cause(&self) -> Option<platform::Error> {
         self.cause.clone()
     }
 
+    /// Returns stacktrace of this [`LocalMediaInitException`].
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -163,10 +168,13 @@ impl EnumerateDevicesException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl EnumerateDevicesException {
+    /// Returns [`platform::Error`] that caused this
+    /// [`EnumerateDevicesException`].
     pub fn cause(&self) -> platform::Error {
         self.cause.clone()
     }
 
+    /// Returns stacktrace of this [`EnumerateDevicesException`].
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -232,18 +240,22 @@ impl RpcClientException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl RpcClientException {
+    /// Returns concrete error kind of this [`RpcClientException`].
     pub fn kind(&self) -> RpcClientExceptionKind {
         self.kind
     }
 
+    /// Returns error message describing the problem.
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
+    /// Returns [`platform::Error`] that caused this [`RpcClientException`].
     pub fn cause(&self) -> Option<platform::Error> {
         self.cause.clone()
     }
 
+    /// Returns stacktrace of this [`RpcClientException`].
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -285,14 +297,17 @@ impl InternalException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl InternalException {
+    /// Returns error message describing the problem.
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
+    /// Returns [`platform::Error`] that caused this [`RpcClientException`].
     pub fn cause(&self) -> Option<platform::Error> {
         self.cause.clone()
     }
 
+    /// Returns stacktrace of this [`InternalException`].
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -315,6 +330,7 @@ impl FormatException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl FormatException {
+    /// Returns describing of the problem.
     pub fn message(&self) -> String {
         self.0.to_string()
     }
@@ -346,10 +362,12 @@ impl MediaStateTransitionException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl MediaStateTransitionException {
+    /// Returns error message describing the problem.
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
+    /// Returns stacktrace of this [`MediaStateTransitionException`].
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -394,14 +412,19 @@ impl MediaSettingsUpdateException {
 
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl MediaSettingsUpdateException {
+    /// Returns error message describing the problem.
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
+    /// Returns original [`ChangeMediaStateError`] that was encountered while
+    /// updating local media settings.
     pub fn cause(&self) -> Error {
         self.cause.clone().into()
     }
 
+    /// Returns whether media settings were successfully rolled back after new
+    /// settings application failed.
     pub fn rolled_back(&self) -> bool {
         self.rolled_back
     }

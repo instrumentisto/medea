@@ -18,11 +18,6 @@ use synstructure::{BindStyle, Structure};
 pub fn derive(mut s: Structure) -> Result<TokenStream> {
     let error_type = error_type(&s)?;
 
-    let name_body = s.each_variant(|v| {
-        let name = &v.ast().ident;
-        quote!(stringify!(#name))
-    });
-
     let cause_body = s.bind_with(|_| BindStyle::Move).each_variant(|v| {
         if let Some(js_error) =
             v.bindings().iter().find(|&bi| is_error(bi, &error_type))
@@ -41,10 +36,6 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
         #[automatically_derived]
         gen impl JsCaused for @Self {
             type Error = #error_type;
-
-            fn name(&self) -> &'static str {
-                match self { #name_body }
-            }
 
             fn js_cause(self) -> Option<Self::Error> {
                 match self { #cause_body }

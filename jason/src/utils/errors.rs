@@ -12,9 +12,6 @@ pub trait JsCaused {
     /// Type of wrapper for JS error.
     type Error;
 
-    /// Returns name of error.
-    fn name(&self) -> &'static str;
-
     /// Returns JS error if it is the cause.
     fn js_cause(self) -> Option<Self::Error>;
 }
