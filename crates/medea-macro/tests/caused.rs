@@ -7,6 +7,7 @@ struct JsError {}
 #[test]
 fn derives_for_structure() {
     #[derive(Caused)]
+    #[cause(error = "JsError")]
     struct TestError;
 
     let err = TestError;
@@ -16,6 +17,7 @@ fn derives_for_structure() {
 #[test]
 fn derives_for_enum_with_js_error() {
     #[derive(Caused)]
+    #[cause(error = "JsError")]
     enum TestError {
         Foo,
         Bar(JsError),
@@ -31,11 +33,13 @@ fn derives_for_enum_with_js_error() {
 #[test]
 fn derives_for_enum_with_nested_js_error() {
     #[derive(Caused)]
+    #[cause(error = "JsError")]
     enum CausedError {
         Baz(JsError),
     }
 
     #[derive(Caused)]
+    #[cause(error = "JsError")]
     enum TestError {
         Foo,
         Bar(#[cause] CausedError),

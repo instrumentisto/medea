@@ -391,6 +391,7 @@ decl_derive!([Caused, attributes(cause)] =>
 /// struct JsError;
 ///
 /// #[derive(Caused)]
+/// #[cause(error = "JsError")]
 /// enum FooError {
 ///     Internal,
 ///     Js(JsError),
@@ -412,12 +413,14 @@ decl_derive!([Caused, attributes(cause)] =>
 /// # struct JsError;
 /// #
 /// # #[derive(Caused)]
+/// # #[cause(error = "JsError")]
 /// # enum FooError {
 /// #     Internal,
 /// #     Js(JsError),
 /// # }
 /// #
 /// #[derive(Caused)]
+/// #[cause(error = "JsError")]
 /// enum BarError {
 ///     Foo(#[cause] FooError),
 /// }
