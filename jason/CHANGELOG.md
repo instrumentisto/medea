@@ -12,9 +12,11 @@ All user visible changes to this project will be documented in this file. This p
 [Diff](/../../compare/medea-jason-0.2.0...medea-jason-0.3.0) | [Milestone](/../../milestone/3) | [Roadmap](/../../issues/182)
 
 ### BC Breaks
-TODO: Mention #209
 - Library API:
     - `ReconnectHandle.reconnect_with_backoff()` performs first reconnect attempt immediately now ([#206]).
+- Error handling ([#214]):
+    - Remove `JasonError`;
+    - Throw errors of the concrete types from Jason.
 
 ### Added
 
@@ -22,6 +24,7 @@ TODO: Mention #209
     - Optional argument to `ReconnectHandle.reconnect_with_backoff()` function that limits max elapsed time ([#206]).
 
 [#206]: /../../pull/206
+[#214]: /../../pull/214
 
 
 

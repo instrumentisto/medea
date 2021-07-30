@@ -6,6 +6,25 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.3.0] · ????-??-??
+[0.3.0]: /../../tree/medea-macro-0.3.0/crates/medea-macro
+
+[Diff](/../../compare/medea-macro-0.2.1...medea-macro-0.3.0)
+
+### BC breaks
+
+- `#[derive(JsCaused)]` ([#214]):
+    - Renamed to `#[derive(Caused)]`;
+    - `#[js(cause)]` renamed to `#[cause]`;
+    - `#[js(error = "...")]` renamed to `#[cause(error = "...")]`.
+
+- Rename `#[derive(JsCaused)]` macro to `#[derive(Caused)]` ([#214])
+
+[#214]: /../../pull/214
+
+
+
+
 ## [0.2.1] · 2021-04-09
 [0.2.1]: /../../tree/medea-macro-0.2.1/crates/medea-macro
 
@@ -33,7 +52,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- `#[derive(Caused)]` macro for deriving `Caused` trait from `medea-jason` crate ([#68]).
+- `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68]).
 - `#[dispatchable]` macro:
     - Optional argument to specify `self` type for methods of `*Handler` trait (e.g. `#[dispatchable(self: &Self)]`) ([#112]);
     - Optional argument that enables [async-trait] integration (e.g. `#[dispatchable(async_trait(?Send))]`) ([#112]).
