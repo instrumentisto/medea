@@ -25,7 +25,7 @@ use crate::{
     media::{track::local, MediaKind},
     peer::{LocalStreamUpdateCriteria, PeerEvent},
     platform,
-    utils::JsCaused,
+    utils::Caused,
 };
 
 use super::tracks_request::TracksRequest;
@@ -220,8 +220,8 @@ pub enum ProhibitedStateError {
 }
 
 /// Errors occurring in [`MediaConnections::insert_local_tracks()`] method.
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum InsertLocalTracksError {
     /// [`local::Track`] doesn't satisfy [`Sender`]'s constraints.
     #[display(fmt = "Provided Track doesn't satisfy senders constraints")]
@@ -232,7 +232,7 @@ pub enum InsertLocalTracksError {
     NotEnoughTracks,
 
     /// Insertion of a [`local::Track`] into a [`Sender`] fails.
-    CouldNotInsertLocalTrack(#[js(cause)] sender::InsertTrackError),
+    CouldNotInsertLocalTrack(#[cause] sender::InsertTrackError),
 }
 
 /// Errors occurring in [`MediaConnections::get_mids()`] method.

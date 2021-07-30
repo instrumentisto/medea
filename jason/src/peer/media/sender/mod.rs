@@ -15,7 +15,7 @@ use crate::{
     },
     peer::TrackEvent,
     platform,
-    utils::JsCaused,
+    utils::Caused,
 };
 
 use super::{
@@ -26,8 +26,8 @@ use super::{
 pub use self::component::{Component, State};
 
 /// Errors occurring when creating a new [`Sender`].
-#[derive(Clone, Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, Caused)]
+#[cause(error = "platform::Error")]
 pub enum CreateError {
     /// [`Sender`] cannot be disabled because it's marked as `required`.
     #[display(fmt = "MediaExchangeState of Sender cannot transit to \
@@ -42,8 +42,8 @@ pub enum CreateError {
 /// Error occuring in [`RTCRtpSender.replaceTrack()`][1] method.
 ///
 /// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 #[display(fmt = "MediaManagerHandle is in detached state")]
 pub struct InsertTrackError(platform::Error);
 

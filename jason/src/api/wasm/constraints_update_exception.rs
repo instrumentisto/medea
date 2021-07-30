@@ -29,8 +29,7 @@ impl ConstraintsUpdateException {
     pub fn recover_reason(&self) -> Error {
         self.0
             .recover_reason()
-            .map(Into::into)
-            .unwrap_or_else(|| JsValue::null().into())
+            .map_or_else(|| JsValue::null().into(), Into::into)
     }
 
     /// Returns a list of [`ChangeMediaStateError`]s due to which a recovery
@@ -50,7 +49,6 @@ impl ConstraintsUpdateException {
     pub fn error(&self) -> Error {
         self.0
             .error()
-            .map(Into::into)
-            .unwrap_or_else(|| JsValue::null().into())
+            .map_or_else(|| JsValue::null().into(), Into::into)
     }
 }

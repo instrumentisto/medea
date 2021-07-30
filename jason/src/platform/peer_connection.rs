@@ -4,7 +4,7 @@ use derive_more::{Display, From};
 
 use crate::{
     platform::{self, RtcStatsError},
-    utils::JsCaused,
+    utils::Caused,
 };
 
 /// Representation of [RTCSdpType].
@@ -49,8 +49,8 @@ pub struct IceCandidate {
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum RtcPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
@@ -80,7 +80,7 @@ pub enum RtcPeerConnectionError {
     /// Occurs while getting and parsing [`platform::RtcStats`] of
     /// [`platform::RtcPeerConnection`].
     #[display(fmt = "Failed to get RTCStats: {}", _0)]
-    RtcStatsError(#[js(cause)] RtcStatsError),
+    RtcStatsError(#[cause] RtcStatsError),
 
     /// [PeerConnection.getStats][1] promise thrown exception.
     ///

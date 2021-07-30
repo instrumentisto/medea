@@ -4,13 +4,13 @@ use derive_more::{Display, From};
 use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 
-use crate::{platform, utils::JsCaused};
+use crate::{platform, utils::Caused};
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
-#[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused, PartialEq)]
+#[cause(error = "platform::Error")]
 #[display(fmt = "EventTarget.addEventListener() failed: {:?}", _0)]
 pub struct EventListenerBindError(platform::Error);
 

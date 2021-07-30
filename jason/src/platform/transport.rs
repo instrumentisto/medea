@@ -8,7 +8,7 @@ use tracerr::Traced;
 use crate::{
     platform,
     rpc::{ClientDisconnect, CloseMsg},
-    utils::{JsCaused, JsonParseError},
+    utils::{Caused, JsonParseError},
 };
 
 /// Possible states of a [`RpcTransport`].
@@ -61,8 +61,8 @@ pub trait RpcTransport {
 }
 
 /// Errors that may occur when working with a [`RpcTransport`].
-#[derive(Clone, Debug, Display, JsCaused, PartialEq)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, Caused, PartialEq)]
+#[cause(error = "platform::Error")]
 pub enum TransportError {
     /// Error encountered when trying to establish connection.
     #[display(fmt = "Failed to create WebSocket: {:?}", _0)]

@@ -33,7 +33,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68]).
+- `#[derive(Caused)]` macro for deriving `Caused` trait from `medea-jason` crate ([#68]).
 - `#[dispatchable]` macro:
     - Optional argument to specify `self` type for methods of `*Handler` trait (e.g. `#[dispatchable(self: &Self)]`) ([#112]);
     - Optional argument that enables [async-trait] integration (e.g. `#[dispatchable(async_trait(?Send))]`) ([#112]).

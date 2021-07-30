@@ -15,13 +15,13 @@ use crate::{
         TrackConstraints, VideoSource,
     },
     platform,
-    utils::JsCaused,
+    utils::Caused,
 };
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`local::Track`]s.
-#[derive(Clone, Debug, Display, Eq, JsCaused, PartialEq)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, Eq, Caused, PartialEq)]
+#[cause(error = "platform::Error")]
 pub enum TracksRequestError {
     /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
     #[display(fmt = "only one audio track is allowed in SimpleTracksRequest")]

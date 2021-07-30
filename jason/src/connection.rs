@@ -10,7 +10,7 @@ use derive_more::Display;
 use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use tracerr::Traced;
 
-use crate::{api, media::track::remote, platform, utils::JsCaused};
+use crate::{api, media::track::remote, platform, utils::Caused};
 
 /// Service which manages [`Connection`]s with remote `Member`s.
 #[derive(Default)]
@@ -85,8 +85,8 @@ impl Connections {
 }
 
 /// Error of [`ConnectionHandle`]'s [`Weak`] pointer being detached.
-#[derive(Clone, Copy, Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Copy, Debug, Display, Caused)]
+#[cause(error = "platform::Error")]
 #[display(fmt = "ConnectionHandle is in detached state")]
 pub struct HandleDetachedError;
 

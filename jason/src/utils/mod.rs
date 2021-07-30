@@ -15,7 +15,7 @@ use medea_reactive::Guarded;
 #[doc(inline)]
 pub use self::{
     component::{AsProtoState, Component, SynchronizableState, Updatable},
-    errors::{JsCaused, JsonParseError},
+    errors::{Caused, JsonParseError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
 

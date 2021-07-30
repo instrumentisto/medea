@@ -1,3 +1,5 @@
+//! Implementations of the API errors which can be throwed.
+
 use std::borrow::Cow;
 
 #[cfg(not(target_os = "android"))]
@@ -21,7 +23,7 @@ use crate::{
         self, ChangeMediaStateError, ConstraintsUpdateError, RoomJoinError,
     },
     rpc::{rpc_session::ConnectionLostReason, ReconnectError, SessionError},
-    utils::JsCaused,
+    utils::Caused,
 };
 
 /// Error thrown when the operation wasn't allowed by the current state of the
@@ -125,22 +127,26 @@ impl LocalMediaInitException {
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl LocalMediaInitException {
     /// Returns concrete error kind of this [`LocalMediaInitException`].
+    #[must_use]
     pub fn kind(&self) -> LocalMediaInitExceptionKind {
         self.kind
     }
 
     /// Returns error message describing the problem.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
     /// Returns [`platform::Error`] that caused this
     /// [`LocalMediaInitException`].
+    #[must_use]
     pub fn cause(&self) -> Option<platform::Error> {
         self.cause.clone()
     }
 
     /// Returns stacktrace of this [`LocalMediaInitException`].
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -170,11 +176,13 @@ impl EnumerateDevicesException {
 impl EnumerateDevicesException {
     /// Returns [`platform::Error`] that caused this
     /// [`EnumerateDevicesException`].
+    #[must_use]
     pub fn cause(&self) -> platform::Error {
         self.cause.clone()
     }
 
     /// Returns stacktrace of this [`EnumerateDevicesException`].
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -241,21 +249,25 @@ impl RpcClientException {
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl RpcClientException {
     /// Returns concrete error kind of this [`RpcClientException`].
+    #[must_use]
     pub fn kind(&self) -> RpcClientExceptionKind {
         self.kind
     }
 
     /// Returns error message describing the problem.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
     /// Returns [`platform::Error`] that caused this [`RpcClientException`].
+    #[must_use]
     pub fn cause(&self) -> Option<platform::Error> {
         self.cause.clone()
     }
 
     /// Returns stacktrace of this [`RpcClientException`].
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -298,16 +310,19 @@ impl InternalException {
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl InternalException {
     /// Returns error message describing the problem.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
     /// Returns [`platform::Error`] that caused this [`RpcClientException`].
+    #[must_use]
     pub fn cause(&self) -> Option<platform::Error> {
         self.cause.clone()
     }
 
     /// Returns stacktrace of this [`InternalException`].
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -331,6 +346,7 @@ impl FormatException {
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl FormatException {
     /// Returns describing of the problem.
+    #[must_use]
     pub fn message(&self) -> String {
         self.0.to_string()
     }
@@ -363,11 +379,13 @@ impl MediaStateTransitionException {
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl MediaStateTransitionException {
     /// Returns error message describing the problem.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
     /// Returns stacktrace of this [`MediaStateTransitionException`].
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
@@ -413,18 +431,21 @@ impl MediaSettingsUpdateException {
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 impl MediaSettingsUpdateException {
     /// Returns error message describing the problem.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.to_string()
     }
 
     /// Returns original [`ChangeMediaStateError`] that was encountered while
     /// updating local media settings.
+    #[must_use]
     pub fn cause(&self) -> Error {
         self.cause.clone().into()
     }
 
     /// Returns whether media settings were successfully rolled back after new
     /// settings application failed.
+    #[must_use]
     pub fn rolled_back(&self) -> bool {
         self.rolled_back
     }
@@ -517,13 +538,13 @@ impl From<Traced<SessionError>> for Error {
             | SE::SessionUnexpectedlyDropped
             | SE::NewConnectionInfo => None,
             SE::RpcClient(err) => {
-                cause = err.js_cause();
+                cause = err.cause();
                 None
             }
             SE::AuthorizationFailed => Some(Kind::AuthorizationFailed),
             SE::ConnectionLost(reason) => {
                 if let Reason::ConnectError(err) = reason {
-                    cause = err.into_inner().js_cause()
+                    cause = err.into_inner().cause()
                 };
                 Some(Kind::ConnectionLost)
             }
