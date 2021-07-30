@@ -393,8 +393,6 @@ impl MediaStateTransitionException {
 
 /// Errors occurring in [`RoomHandle::set_local_media_settings()`][1] method.
 ///
-/// It can be converted into a [`DartError`] and passed to Dart.
-///
 /// [1]: crate::api::RoomHandle::set_local_media_settings
 #[cfg_attr(not(target_os = "android"), wasm_bindgen)]
 pub struct MediaSettingsUpdateException {

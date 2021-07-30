@@ -17,14 +17,15 @@ pub struct ConstraintsUpdateException(room::ConstraintsUpdateError);
 
 #[wasm_bindgen]
 impl ConstraintsUpdateException {
-    /// Returns a name of this [`ConstraintsUpdateError`].
+    /// Returns a name of this [`room::ConstraintsUpdateError`].
     #[must_use]
     pub fn name(&self) -> String {
         self.0.name()
     }
 
-    /// Returns a [`ChangeMediaStateError`] if this [`ConstraintsUpdateError`]
-    /// represents a `RecoveredException` or a `RecoverFailedException`.
+    /// Returns a [`room::ChangeMediaStateError`] if this
+    /// [`room::ConstraintsUpdateError`] represents a `RecoveredException` or a
+    /// `RecoverFailedException`.
     #[must_use]
     pub fn recover_reason(&self) -> Error {
         self.0
@@ -32,8 +33,8 @@ impl ConstraintsUpdateException {
             .map_or_else(|| JsValue::null().into(), Into::into)
     }
 
-    /// Returns a list of [`ChangeMediaStateError`]s due to which a recovery
-    /// has failed.
+    /// Returns a list of [`room::ChangeMediaStateError`]s due to which a
+    /// recovery has failed.
     #[must_use]
     pub fn recover_fail_reasons(&self) -> Vec<JsValue> {
         self.0
@@ -43,8 +44,8 @@ impl ConstraintsUpdateException {
             .collect()
     }
 
-    /// Returns a [`ChangeMediaStateError`] if this [`ConstraintsUpdateError`]
-    /// represents an `ErroredException`.
+    /// Returns a [`room::ChangeMediaStateError`] if this
+    /// [`room::ConstraintsUpdateError`] represents an `ErroredException`.
     #[must_use]
     pub fn error(&self) -> Error {
         self.0
