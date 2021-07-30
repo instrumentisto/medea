@@ -88,7 +88,7 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
-    api,
+    api as japi,
     media::{
         track::remote, AudioTrackConstraints, DeviceVideoTrackConstraints,
         LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
@@ -140,16 +140,69 @@ extern "C" {
 
 #[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
-    fn get_jason_error(err: JsValue) -> api::Error;
+    fn get_jason_error(err: JsValue) -> japi::Error;
+}
+
+#[wasm_bindgen(inline_js = "export const get_error = (e) => e;")]
+extern "C" {
+    pub fn get_error(err: JsValue) -> japi::Error;
+}
+
+#[wasm_bindgen(inline_js = "export const get_state_exception = (e) => e;")]
+extern "C" {
+    pub fn get_state_exception(err: JsValue) -> japi::errors::StateError;
 }
 
 #[wasm_bindgen(
     inline_js = "export const get_constraints_update_exception = (e) => e;"
 )]
 extern "C" {
-    fn get_constraints_update_exception(
+    pub fn get_constraints_update_exception(
         err: JsValue,
-    ) -> api::ConstraintsUpdateException;
+    ) -> japi::ConstraintsUpdateException;
+}
+
+#[wasm_bindgen(
+    inline_js = "export const get_enumerate_devices_exception = (e) => e;"
+)]
+extern "C" {
+    pub fn get_enumerate_devices_exception(
+        err: JsValue,
+    ) -> japi::errors::EnumerateDevicesException;
+}
+
+#[wasm_bindgen(
+    inline_js = "export const get_media_state_transition_exception = (e) => e;"
+)]
+extern "C" {
+    pub fn get_media_state_transition_exception(
+        err: JsValue,
+    ) -> japi::errors::MediaStateTransitionException;
+}
+
+#[wasm_bindgen(
+    inline_js = "export const get_local_media_init_exception = (e) => e;"
+)]
+extern "C" {
+    pub fn get_local_media_init_exception(
+        err: JsValue,
+    ) -> japi::errors::LocalMediaInitException;
+}
+
+#[wasm_bindgen(
+    inline_js = "export const get_media_settings_update_exception = (e) => e;"
+)]
+extern "C" {
+    pub fn get_media_settings_update_exception(
+        err: JsValue,
+    ) -> japi::errors::MediaSettingsUpdateException;
+}
+
+#[wasm_bindgen(inline_js = "export const get_internal_exception = (e) => e;")]
+extern "C" {
+    pub fn get_internal_exception(
+        err: JsValue,
+    ) -> japi::errors::InternalException;
 }
 
 pub fn get_test_required_tracks() -> (Track, Track) {
@@ -258,14 +311,14 @@ pub async fn delay_for(delay_ms: i32) {
 fn media_stream_settings(
     is_audio_enabled: bool,
     is_video_enabled: bool,
-) -> api::MediaStreamSettings {
-    let mut settings = api::MediaStreamSettings::new();
+) -> japi::MediaStreamSettings {
+    let mut settings = japi::MediaStreamSettings::new();
     if is_audio_enabled {
-        settings.audio(api::AudioTrackConstraints::new());
+        settings.audio(japi::AudioTrackConstraints::new());
     }
     if is_video_enabled {
-        settings.device_video(api::DeviceVideoTrackConstraints::new());
-        settings.display_video(api::DisplayVideoTrackConstraints::new());
+        settings.device_video(japi::DeviceVideoTrackConstraints::new());
+        settings.display_video(japi::DisplayVideoTrackConstraints::new());
     }
 
     settings
@@ -305,7 +358,7 @@ async fn wait_and_check_test_result(
     };
 }
 
-async fn get_video_track() -> api::RemoteMediaTrack {
+async fn get_video_track() -> japi::RemoteMediaTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
@@ -314,7 +367,7 @@ async fn get_video_track() -> api::RemoteMediaTrack {
     remote::Track::new(track, MediaSourceKind::Device, true, false).into()
 }
 
-async fn get_audio_track() -> api::RemoteMediaTrack {
+async fn get_audio_track() -> japi::RemoteMediaTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());

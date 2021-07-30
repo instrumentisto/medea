@@ -17,14 +17,15 @@ use medea_client_api_proto::{
     VideoSettings,
 };
 use medea_jason::{
-    api, media::MediaKind, peer::PeerConnection, room::Room,
-    rpc::MockRpcSession, utils::Updatable,
+    api, api::errors::LocalMediaInitExceptionKind, media::MediaKind,
+    peer::PeerConnection, room::Room, rpc::MockRpcSession, utils::Updatable,
 };
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_constraints_update_exception, get_jason_error,
+    delay_for, get_local_media_init_exception, get_state_exception,
     get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
@@ -139,13 +140,9 @@ async fn error_get_local_stream_on_new_peer() {
     .await
     .unwrap();
 
-    let (cb, test_result) = js_callback!(|err: api::Error| {
-        cb_assert_eq!(&err.name(), "UpdateLocalStreamError");
-        cb_assert_eq!(
-            &err.message(),
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: error_get_local_stream_on_new_peer"
-        );
+    let (cb, test_result) = js_callback!(|err: JsValue| {
+        let e = get_local_media_init_exception(err);
+        assert!(e.message().contains("error_get_local_stream_on_new_peer"));
     });
 
     room_handle.on_failed_local_media(cb.into()).unwrap();
@@ -185,13 +182,12 @@ async fn error_join_room_without_on_failed_stream_callback() {
         .on_connection_loss(js_sys::Function::new_no_args(""))
         .unwrap();
 
-    let err = get_jason_error(
+    let err = get_state_exception(
         JsFuture::from(room_handle.join(String::from(TEST_ROOM_URL)))
             .await
             .unwrap_err(),
     );
 
-    assert_eq!(err.name(), "CallbackNotSet");
     assert_eq!(
         err.message(),
         "`Room.on_failed_local_media()` callback isn't set.",
@@ -215,13 +211,12 @@ async fn error_join_room_without_on_connection_loss_callback() {
         .on_failed_local_media(js_sys::Function::new_no_args(""))
         .unwrap();
 
-    let err = get_jason_error(
+    let err = get_state_exception(
         JsFuture::from(room_handle.join(String::from(TEST_ROOM_URL)))
             .await
             .unwrap_err(),
     );
 
-    assert_eq!(err.name(), "CallbackNotSet");
     assert_eq!(
         err.message(),
         "`Room.on_connection_loss()` callback isn't set.",
@@ -1836,13 +1831,8 @@ async fn no_updates_sent_if_gum_fails_on_enable() {
     let err = JsFuture::from(room_handle.enable_audio())
         .await
         .unwrap_err();
-    let e = get_jason_error(err);
-    assert_eq!(e.name(), "CouldNotGetLocalMedia");
-    assert_eq!(
-        e.message(),
-        "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-         Unknown JS error: gum error",
-    );
+    let e = get_local_media_init_exception(err);
+    assert!(e.message().contains("gum error"));
     mock.stop();
     drop(room);
 
@@ -1880,19 +1870,14 @@ async fn set_media_state_return_media_error() {
 
     mock.error_get_user_media(ERROR_MSG.into());
 
-    let err = get_jason_error(
+    let err = get_local_media_init_exception(
         JsFuture::from(room_handle.enable_audio())
             .await
             .unwrap_err(),
     );
-    assert_eq!(
-        err.message(),
-        format!(
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: {}",
-            ERROR_MSG
-        )
-    );
+
+    assert_eq!(err.kind(), LocalMediaInitExceptionKind::GetUserMediaFailed);
+    assert!(err.message().contains(ERROR_MSG));
 
     mock.stop();
 }
@@ -2007,22 +1992,24 @@ async fn send_enabling_holds_local_tracks() {
 
     let mock = MockNavigator::new();
     mock.error_get_user_media("foobar".into());
-    let err = get_jason_error(
+    let err = get_local_media_init_exception(
         JsFuture::from(room_handle.enable_video(None))
             .await
             .unwrap_err(),
     );
-    assert_eq!(
-        err.message(),
-        "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-         Unknown JS error: foobar"
-    );
+    assert_eq!(err.kind(), LocalMediaInitExceptionKind::GetUserMediaFailed,);
+    assert!(err.message().contains("foobar"));
     mock.stop();
 }
 
 /// Tests for [`RoomHandle::set_local_media_settings`].
 mod set_local_media_settings {
     use super::*;
+
+    use crate::{
+        get_constraints_update_exception, get_local_media_init_exception,
+        get_media_state_transition_exception,
+    };
 
     /// Sets up connection between two peers in single room with first peer
     /// sending video to second peer.
@@ -2180,8 +2167,8 @@ mod set_local_media_settings {
         let (room, _rx) = get_test_room(Box::pin(event_rx));
         let room_handle = api::RoomHandle::from(room.new_handle());
 
-        let (cb, test_result) = js_callback!(|err: api::Error| {
-            cb_assert_eq!(&err.name(), "SenderCreateError");
+        let (cb, test_result) = js_callback!(|err: JsValue| {
+            let err = get_media_state_transition_exception(err);
             cb_assert_eq!(
                 err.message(),
                 "MediaExchangeState of Sender cannot transit to \
@@ -2226,8 +2213,8 @@ mod set_local_media_settings {
     ///     1. `on_failed_local_media` was invoked.
     #[wasm_bindgen_test]
     async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-        let (cb, test_result) = js_callback!(|err: api::Error| {
-            cb_assert_eq!(&err.name(), "UpdateLocalStreamError");
+        let (cb, test_result) = js_callback!(|err: JsValue| {
+            let err = get_media_state_transition_exception(err);
             cb_assert_eq!(
                 &err.message(),
                 "provided multiple device video MediaStreamTracks"
@@ -2252,12 +2239,12 @@ mod set_local_media_settings {
             .await
             .unwrap_err(),
         );
-        let err = err.error().unwrap();
-        assert_eq!(err.name(), "InvalidLocalTracks");
-        assert_eq!(
-            err.message(),
-            "provided multiple device video MediaStreamTracks"
-        );
+
+        let recover_reason_err =
+            get_media_state_transition_exception(err.error().into());
+        assert!(recover_reason_err
+            .message()
+            .contains("provided multiple device video MediaStreamTracks"));
 
         wait_and_check_test_result(test_result, || {}).await;
     }
@@ -2406,15 +2393,9 @@ mod set_local_media_settings {
         );
         mock_navigator.stop();
 
-        assert_eq!(&err.name(), "RecoveredException");
-        let err = err.recover_reason().unwrap();
-
-        assert_eq!(err.name(), "CouldNotGetLocalMedia");
-        assert_eq!(
-            err.message(),
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: disables_on_fail"
-        );
+        let recover_reason_err =
+            get_local_media_init_exception(err.recover_reason().into());
+        assert!(recover_reason_err.message().contains("disables_on_fail"));
 
         assert!(!peer1.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer1.get_send_tracks().is_empty());
@@ -2447,9 +2428,11 @@ mod set_local_media_settings {
         );
         mock_navigator.stop();
 
-        assert_eq!(err.name(), "RecoveredException");
-        let recover_reason = err.recover_reason().unwrap();
-        assert_eq!(recover_reason.name(), "CouldNotGetLocalMedia");
+        let recover_reason_err =
+            get_local_media_init_exception(err.recover_reason().into());
+        assert!(recover_reason_err.message().contains(
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed"
+        ));
 
         assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
 
@@ -2485,24 +2468,13 @@ mod set_local_media_settings {
         );
         mock_navigator.stop();
 
-        assert_eq!(err.name(), "RecoverFailedException");
-        let recover_reason = err.recover_reason().unwrap();
-        assert_eq!(recover_reason.name(), "CouldNotGetLocalMedia");
-        assert_eq!(
-            recover_reason.message(),
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: disables_on_rollback_fail"
-        );
-        let recover_fail_reasons =
-            js_sys::Array::from(&err.recover_fail_reasons());
-        assert_eq!(recover_fail_reasons.length(), 1);
-        let recover_fail_reason = err.recover_reason().unwrap();
-        assert_eq!(
-            recover_fail_reason.message(),
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: disables_on_rollback_fail"
-        );
-        assert_eq!(recover_fail_reason.name(), "CouldNotGetLocalMedia");
+        let recover_reason_err =
+            get_local_media_init_exception(err.recover_reason().into());
+        assert!(recover_reason_err.message().contains(
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed"
+        ));
+        let recover_fail_reasons = err.recover_fail_reasons();
+        assert_eq!(recover_fail_reasons.len(), 1);
 
         assert!(!peer1.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer1.get_send_tracks().is_empty());
@@ -2538,9 +2510,11 @@ mod set_local_media_settings {
         );
         mock_navigator.stop();
 
-        assert_eq!(err.name(), "RecoveredException");
-        let err = err.recover_reason().unwrap();
-        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+        let recover_reason_err =
+            get_local_media_init_exception(err.recover_reason().into());
+        assert!(recover_reason_err.message().contains(
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed"
+        ));
 
         assert!(peer1.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert_eq!(peer1.get_send_tracks().len(), 1);
