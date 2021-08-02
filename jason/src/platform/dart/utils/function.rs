@@ -96,6 +96,8 @@ impl<T: Into<DartValue>> Function<T> {
 impl<T> Drop for Function<T> {
     /// Manually deallocates saved [`Dart_PersistentHandle`] so it won't leak.
     fn drop(&mut self) {
-        unsafe { Dart_DeletePersistentHandle_DL_Trampolined(self.dart_fn) };
+        unsafe {
+            Dart_DeletePersistentHandle_DL_Trampolined(self.dart_fn);
+        }
     }
 }

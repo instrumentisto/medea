@@ -24,6 +24,7 @@ use super::MAX_WS_MSG_SIZE;
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
+#[allow(clippy::unused_async)]
 async fn ws_index(
     request: HttpRequest,
     state: Data<Context>,

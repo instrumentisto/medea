@@ -163,7 +163,7 @@ impl PeersService {
     /// [`Room`]: crate::signalling::Room
     #[inline]
     pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
-        self.peers.add_peer(peer)
+        self.peers.add_peer(peer);
     }
 
     /// Applies a function to the [`PeerStateMachine`] reference with provided
@@ -239,7 +239,7 @@ impl PeersService {
         sink_peer.add_endpoint(&sink.clone().into());
 
         src_peer.as_changes_scheduler().add_publisher(
-            &src,
+            src,
             &mut sink_peer,
             &self.tracks_count,
         );
@@ -401,7 +401,7 @@ impl PeersService {
                 second_peer_id,
             ))
         } else {
-            let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
+            let (src_peer_id, sink_peer_id) = self.create_peers(src, sink);
 
             self.peer_post_construct(src_peer_id, &src.clone().into())
                 .await?;
@@ -610,7 +610,7 @@ impl PeersService {
         peer_id: PeerId,
     ) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
-            self.peer_metrics_service.borrow_mut().update_peer(&peer);
+            self.peer_metrics_service.borrow_mut().update_peer(peer);
         })?;
         Ok(())
     }

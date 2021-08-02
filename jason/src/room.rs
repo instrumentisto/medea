@@ -1150,7 +1150,7 @@ impl InnerRoom {
                 self.recv_constraints.set_enabled(exchange == Enabled, kind);
             }
             (Recv, Mute(_)) => {
-                unreachable!("Receivers muting is not implemented")
+                unreachable!("Receivers muting is not implemented");
             }
         }
     }

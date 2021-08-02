@@ -109,14 +109,14 @@ impl LocalTracksConstraints {
         &self,
         settings: &MediaStreamSettings,
     ) -> LocalStreamUpdateCriteria {
-        self.0.borrow().calculate_kinds_diff(&settings)
+        self.0.borrow().calculate_kinds_diff(settings)
     }
 
     /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
     /// [`MediaStreamSettings`].
     #[inline]
     pub fn constrain(&self, other: MediaStreamSettings) {
-        self.0.borrow_mut().constrain(other)
+        self.0.borrow_mut().constrain(other);
     }
 
     /// Clones the underlying [`MediaStreamSettings`].
@@ -150,7 +150,7 @@ impl LocalTracksConstraints {
     ) {
         self.0
             .borrow_mut()
-            .set_media_exchange_state_by_kinds(state, kinds)
+            .set_media_exchange_state_by_kinds(state, kinds);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying

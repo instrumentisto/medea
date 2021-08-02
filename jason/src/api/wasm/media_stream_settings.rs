@@ -29,7 +29,7 @@ impl MediaStreamSettings {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
     pub fn audio(&mut self, constraints: AudioTrackConstraints) {
-        self.0.audio(constraints.into())
+        self.0.audio(constraints.into());
     }
 
     /// Set constraints that will be used to obtain a local video sourced from
@@ -103,14 +103,14 @@ impl DeviceVideoTrackConstraints {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
-        self.0.ideal_facing_mode(facing_mode.into())
+        self.0.ideal_facing_mode(facing_mode.into());
     }
 
     /// Sets an exact [`height`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
     pub fn exact_height(&mut self, height: u32) {
-        self.0.exact_height(height)
+        self.0.exact_height(height);
     }
 
     /// Sets an ideal [`height`][1] constraint.

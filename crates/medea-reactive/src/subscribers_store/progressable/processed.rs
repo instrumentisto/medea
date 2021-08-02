@@ -24,6 +24,7 @@ where
     I: IntoIterator<Item = Factory<'static, T>>,
     T: 'static,
 {
+    #[allow(clippy::needless_collect)]
     let futures: Vec<_> = futures.into_iter().collect();
     AllProcessed::new(Box::new(move || {
         let futures = futures.iter().map(AsRef::as_ref).map(|f| f());

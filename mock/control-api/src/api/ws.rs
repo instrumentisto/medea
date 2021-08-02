@@ -30,6 +30,7 @@ use crate::{
 /// Errors if handshake fails for any underlying reason.
 ///
 /// [WebSocket]: https://en.wikipedia.org/wiki/WebSocket
+#[allow(clippy::unused_async)]
 pub async fn create_ws(
     request: HttpRequest,
     path: Path<String>,
@@ -140,7 +141,7 @@ impl Actor for WsSession {
         if let Some(subs) =
             self.subscribers.lock().unwrap().get_mut(&self.room_id)
         {
-            subs.retain(|sub| *sub != this)
+            subs.retain(|sub| *sub != this);
         }
     }
 }
@@ -187,7 +188,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                                 msg.clone(),
                                             ),
                                         ));
-                                    })
+                                    });
                             }
                         }
                         Err(err) => error!(

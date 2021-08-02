@@ -53,7 +53,6 @@ pub enum MembersLoadError {
     EndpointNotFound(String),
 }
 
-#[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
@@ -305,7 +304,7 @@ impl Member {
         self.sinks()
             .values()
             .filter_map(|p| p.peer_id().map(|id| (id, p)))
-            .filter(|(id, _)| peer_ids.contains(&id))
+            .filter(|(id, _)| peer_ids.contains(id))
             .for_each(|(_, p)| p.reset());
     }
 
@@ -330,7 +329,7 @@ impl Member {
         &self,
         credentials: &client_proto::Credential,
     ) -> bool {
-        self.0.borrow().credentials.verify(&credentials)
+        self.0.borrow().credentials.verify(credentials)
     }
 
     /// Returns all srcs of this [`Member`].

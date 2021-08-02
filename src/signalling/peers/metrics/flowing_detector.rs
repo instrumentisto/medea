@@ -142,7 +142,7 @@ impl RtcStatsHandler for TrafficFlowDetector {
         if let Some(partner_peer_stat) = self.peers.get(&peer.partner_peer_id())
         {
             first_peer_stat.borrow_mut().partner_peer =
-                Rc::downgrade(&partner_peer_stat);
+                Rc::downgrade(partner_peer_stat);
             partner_peer_stat.borrow_mut().partner_peer =
                 Rc::downgrade(&first_peer_stat);
         }

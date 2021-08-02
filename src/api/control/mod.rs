@@ -122,7 +122,6 @@ pub enum RootElement {
 /// This error is used in all [`TryFrom`] impls of Control API.
 ///
 /// [`TryFrom`]: std::convert::TryFrom
-#[allow(clippy::pub_enum_variant_names)]
 #[derive(Clone, Debug, Display, Fail)]
 pub enum TryFromElementError {
     /// Element is not `Room`.
@@ -137,7 +136,6 @@ pub enum TryFromElementError {
 /// Errors which can happen while loading static [Control API] specs.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Display, Fail)]
 pub enum LoadStaticControlSpecsError {
     /// Error while reading default or provided in config
@@ -229,7 +227,7 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     {
         let entry = entry?;
         let spec = load_from_yaml_file(entry.path())?;
-        specs.push(spec)
+        specs.push(spec);
     }
     Ok(specs)
 }

@@ -173,7 +173,7 @@ impl MediaStreamTrack {
     /// [3]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
     #[inline]
     pub fn stop(&self) {
-        self.sys_track.stop()
+        self.sys_track.stop();
     }
 
     /// Returns an [`enabled`][1] attribute of the underlying

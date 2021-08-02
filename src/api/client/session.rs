@@ -139,7 +139,7 @@ impl WsSession {
         text: &str,
     ) {
         self.last_activity = Instant::now();
-        match serde_json::from_str::<ClientMsg>(&text) {
+        match serde_json::from_str::<ClientMsg>(text) {
             Ok(ClientMsg::Pong(n)) => {
                 debug!("{}: Received Pong: {}", self, n);
             }
@@ -269,7 +269,7 @@ impl WsSession {
                             CloseReason::InternalError
                         }
                     };
-                    this.send_left_room(ctx, room_id, reason)
+                    this.send_left_room(ctx, room_id, reason);
                 }
             })
             .wait(ctx);
@@ -278,7 +278,7 @@ impl WsSession {
                 "{}: Failed to authorize Rpc Session: Room `{}` does not exist",
                 self, room_id
             );
-            self.send_left_room(ctx, room_id, CloseReason::Rejected)
+            self.send_left_room(ctx, room_id, CloseReason::Rejected);
         }
     }
 
@@ -293,14 +293,14 @@ impl WsSession {
         _: MemberId,
         reason: ClosedReason,
     ) {
-        if let Some((member, room)) = self.sessions.remove(&room_id) {
+        if let Some((member, room)) = self.sessions.remove(room_id) {
             actix::spawn(room.connection_closed(member, reason));
         }
         if self.sessions.is_empty() {
             self.close_in_place(
                 ctx,
                 &CloseDescription::new(CloseReason::Finished),
-            )
+            );
         }
     }
 
@@ -315,7 +315,7 @@ impl WsSession {
         state: &state::Room,
     ) {
         debug!("{}: Received synchronization request: {:?}", self, state);
-        if let Some((member_id, room)) = self.sessions.get(&room_id) {
+        if let Some((member_id, room)) = self.sessions.get(room_id) {
             ctx.wait(room.synchronize(member_id.clone()).into_actor(self));
         }
     }
@@ -396,7 +396,7 @@ impl WsSession {
                 self.fragmentation_buffer.extend_from_slice(&*value);
                 let frame = self.fragmentation_buffer.split();
                 match std::str::from_utf8(frame.as_ref()) {
-                    Ok(text) => self.handle_text(ctx, &text),
+                    Ok(text) => self.handle_text(ctx, text),
                     Err(err) => {
                         error!("{}: Could not parse ws frame: {}", self, err);
                     }
@@ -587,7 +587,7 @@ impl RpcConnection for Addr<WsSession> {
                         // RpcConnection is already closed, so it ok
                     }
                     MailboxError::Timeout => {
-                        error!("Failed Close RpcConnection")
+                        error!("Failed Close RpcConnection");
                     }
                 }
             }
@@ -683,7 +683,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     /// execution.
     fn finished(&mut self, ctx: &mut Self::Context) {
         debug!("{}: message stream is finished", self);
-        ctx.stop()
+        ctx.stop();
     }
 }
 

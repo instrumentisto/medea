@@ -375,7 +375,7 @@ impl PeerConnection {
                     id,
                     &sender,
                     peer_connection_state,
-                )
+                );
             },
         ));
 
@@ -451,7 +451,7 @@ impl PeerConnection {
     /// [`Sender`]: sender::Sender
     #[inline]
     pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
-        self.media_connections.drop_send_tracks(kinds).await
+        self.media_connections.drop_send_tracks(kinds).await;
     }
 
     /// Filters out already sent stats, and send new stats from the provided

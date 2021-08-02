@@ -1118,9 +1118,9 @@ impl Peer<WaitLocalSdp> {
 
         for (id, track) in tracks {
             let mid = mids
-                .remove(&id)
+                .remove(id)
                 .ok_or_else(|| PeerError::MidsMismatch(track.id()))?;
-            track.set_mid(mid)
+            track.set_mid(mid);
         }
 
         Ok(())
@@ -1481,7 +1481,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 })
                 .collect();
             if changes_indexes_to_remove.is_empty() {
-                self.schedule_change(PeerChange::RemoveTrack(*id))
+                self.schedule_change(PeerChange::RemoveTrack(*id));
             } else {
                 for remove_index in changes_indexes_to_remove {
                     self.context.peer_changes_queue.remove(remove_index);

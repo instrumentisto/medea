@@ -87,7 +87,7 @@ impl LocalStreamUpdateCriteria {
     #[inline]
     pub fn add(&mut self, media_kind: MediaKind, source_kind: MediaSourceKind) {
         self.0
-            .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
+            .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0);
     }
 
     /// Checks whether this [`LocalStreamUpdateCriteria`] contains the provided

@@ -375,7 +375,7 @@ impl RtcPeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
     ) -> Result<()> {
-        let mut cand_init = RtcIceCandidateInit::new(&candidate);
+        let mut cand_init = RtcIceCandidateInit::new(candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
             .sdp_mid(sdp_mid.as_ref().map(String::as_ref));

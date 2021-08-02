@@ -23,7 +23,7 @@ pub unsafe extern "C" fn AudioTrackConstraints__device_id(
     mut this: ptr::NonNull<AudioTrackConstraints>,
     device_id: ptr::NonNull<c_char>,
 ) {
-    this.as_mut().device_id(c_str_into_string(device_id))
+    this.as_mut().device_id(c_str_into_string(device_id));
 }
 
 /// Frees the data behind the provided pointer.

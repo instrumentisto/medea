@@ -204,7 +204,7 @@ impl Room {
             Event::PeersRemoved {
                 peer_ids: removed_peers_ids,
             },
-        )
+        );
     }
 
     /// Connects interconnected `Endpoint`s between provided [`Member`]s.
@@ -231,7 +231,7 @@ impl Room {
             if src.owner().id() == member2_id {
                 connect_endpoints_tasks.push(
                     self.peers.clone().connect_endpoints(src, sink.clone()),
-                )
+                );
             }
         }
 
@@ -287,7 +287,7 @@ impl Room {
             "Peers {:?} removed for member [id = {}].",
             peers_id, member_id
         );
-        if let Ok(member) = self.members.get_member_by_id(&member_id) {
+        if let Ok(member) = self.members.get_member_by_id(member_id) {
             member.peers_removed(&peers_id);
             self.send_peers_removed(member_id, peers_id);
         }
@@ -340,13 +340,13 @@ impl Room {
         ctx: &mut Context<Room>,
     ) {
         let removed_peers =
-            self.peers.remove_peers_related_to_member(&member_id);
+            self.peers.remove_peers_related_to_member(member_id);
         for (peer_member_id, peers_ids) in removed_peers {
             self.member_peers_removed(peers_ids, &peer_member_id);
         }
 
         self.members
-            .close_member_connection(&member_id, ws_close_reason, ctx);
+            .close_member_connection(member_id, ws_close_reason, ctx);
 
         if let Ok(member) = self.members.get_member_by_id(member_id) {
             if let (Some(url), Some(reason)) =

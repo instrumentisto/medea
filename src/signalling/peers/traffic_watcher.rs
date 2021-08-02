@@ -176,7 +176,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     }
 
     fn unregister_room(&self, room_id: RoomId) {
-        self.do_send(UnregisterRoom(room_id))
+        self.do_send(UnregisterRoom(room_id));
     }
 
     async fn register_peer(
@@ -194,7 +194,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
     }
 
     fn unregister_peers(&self, room_id: RoomId, peers_ids: Vec<PeerId>) {
-        self.do_send(UnregisterPeers { room_id, peers_ids })
+        self.do_send(UnregisterPeers { room_id, peers_ids });
     }
 
     fn traffic_flows(
@@ -208,7 +208,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
             room_id,
             peer_id,
             source,
-        })
+        });
     }
 
     fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant) {
@@ -217,7 +217,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
             room_id,
             peer_id,
             at,
-        })
+        });
     }
 }
 

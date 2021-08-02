@@ -67,7 +67,7 @@ impl Drop for WebRtcPublishEndpointInner {
             .filter_map(WeakWebRtcPlayEndpoint::safe_upgrade)
         {
             if let Some(receiver_owner) = receiver.weak_owner().safe_upgrade() {
-                drop(receiver_owner.remove_sink(&receiver.id()))
+                drop(receiver_owner.remove_sink(&receiver.id()));
             }
         }
     }
@@ -98,7 +98,7 @@ impl WebRtcPublishEndpointInner {
     }
 
     fn reset(&mut self) {
-        self.peer_ids = HashSet::new()
+        self.peer_ids = HashSet::new();
     }
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -108,7 +108,7 @@ impl WebRtcPublishEndpointInner {
 
     fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
         for peer_id in peer_ids {
-            self.remove_peer_id(peer_id)
+            self.remove_peer_id(peer_id);
         }
     }
 }
@@ -148,7 +148,7 @@ impl WebRtcPublishEndpoint {
     /// Adds [`WebRtcPlayEndpoint`] (sink) to this [`WebRtcPublishEndpoint`].
     #[inline]
     pub fn add_sink(&self, sink: WeakWebRtcPlayEndpoint) {
-        self.0.borrow_mut().add_sinks(sink)
+        self.0.borrow_mut().add_sinks(sink);
     }
 
     /// Returns all [`WebRtcPlayEndpoint`]s (sinks) of this
@@ -177,7 +177,7 @@ impl WebRtcPublishEndpoint {
     /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
     #[inline]
     pub fn add_peer_id(&self, peer_id: PeerId) {
-        self.0.borrow_mut().add_peer_id(peer_id)
+        self.0.borrow_mut().add_peer_id(peer_id);
     }
 
     /// Returns all [`PeerId`]s of this [`WebRtcPublishEndpoint`].
@@ -192,13 +192,13 @@ impl WebRtcPublishEndpoint {
     /// _Atm this only resets `peer_ids`._
     #[inline]
     pub fn reset(&self) {
-        self.0.borrow_mut().reset()
+        self.0.borrow_mut().reset();
     }
 
     /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     #[inline]
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
-        self.0.borrow_mut().remove_peer_ids(peer_ids)
+        self.0.borrow_mut().remove_peer_ids(peer_ids);
     }
 
     /// Returns [`Id`] of this [`WebRtcPublishEndpoint`].

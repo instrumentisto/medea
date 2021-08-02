@@ -80,7 +80,7 @@ impl WebRtcPlayEndpointInner {
         partner_pid: PeerId,
     ) {
         self.peer_id = Some(pid);
-        self.partner_peer_id = Some(partner_pid)
+        self.partner_peer_id = Some(partner_pid);
     }
 
     fn peer_id(&self) -> Option<PeerId> {
@@ -88,7 +88,7 @@ impl WebRtcPlayEndpointInner {
     }
 
     fn reset(&mut self) {
-        self.peer_id = None
+        self.peer_id = None;
     }
 }
 
@@ -96,7 +96,7 @@ impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
         if let Some(receiver_publisher) = self.src.safe_upgrade() {
             if let Some(partner_peer_id) = self.partner_peer_id {
-                receiver_publisher.remove_peer_ids(&[partner_peer_id])
+                receiver_publisher.remove_peer_ids(&[partner_peer_id]);
             }
             receiver_publisher.remove_empty_weaks_from_sinks();
         }
@@ -191,7 +191,7 @@ impl WebRtcPlayEndpoint {
     /// _Atm this only resets [`PeerId`]._
     #[inline]
     pub fn reset(&self) {
-        self.0.borrow_mut().reset()
+        self.0.borrow_mut().reset();
     }
 
     /// Returns [`Id`] of this [`WebRtcPlayEndpoint`].

@@ -35,7 +35,7 @@ mod grpc {
             .iter()
             .chain(out_files.iter())
             .for_each(|filename| {
-                println!("cargo:rerun-if-changed={}", filename)
+                println!("cargo:rerun-if-changed={}", filename);
             });
 
         for filename in &out_files {
