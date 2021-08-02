@@ -68,7 +68,7 @@ smart-default = "0.6"
 subtle = { version = "2.2", default-features = false }
 tokio = { version = "1.5", features = ["signal", "time"] }
 toml = "0.5"
-tonic = "0.4"
+tonic = "0.5"
 url = "2.1"
 [dependencies.deadpool]
     version = "0.8"
