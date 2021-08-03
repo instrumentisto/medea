@@ -5,7 +5,15 @@ Jason Flutter plugin
 
 Client library for integration with [Medea] media server in Flutter applications.
 
-__Currently, in early development phase.__
+
+
+
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
 
 ## License
 

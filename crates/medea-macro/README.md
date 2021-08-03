@@ -16,6 +16,13 @@ __DO NOT use this crate directly.__ It's for internal use by [Medea] crates only
 
 
 
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
+
 ## License
 
 Copyright © 2019 Instrumentisto Team, <https://github.com/instrumentisto>

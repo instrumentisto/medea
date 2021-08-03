@@ -12,6 +12,13 @@ This app is used for E2E tests and for debugging purposes of [Medea]'s [Control 
 
 
 
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
+
 ## Endpoints
 
 

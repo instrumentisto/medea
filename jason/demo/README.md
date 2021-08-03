@@ -12,6 +12,13 @@ Demo application for performing video calls via [Medea] media server.
 
 
 
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
+
 ## Installation
 
 

@@ -24,6 +24,13 @@ See [demo](https://github.com/instrumentisto/medea/blob/master/jason/demo) for a
 
 
 
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
+
 ## License
 
 Copyright © 2019 Instrumentisto Team, <https://github.com/instrumentisto>

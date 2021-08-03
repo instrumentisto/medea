@@ -16,6 +16,13 @@ Client library for integration with [Medea] media server in a web browser.
 
 
 
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
+
 ## License
 
 Copyright © 2019 Instrumentisto Team, <https://github.com/instrumentisto>

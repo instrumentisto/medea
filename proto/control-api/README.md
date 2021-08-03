@@ -17,6 +17,13 @@ Only [gRPC] is supported at the moment.
 
 
 
+## Status
+
+__PROJECT IS CLOSED. NO MAINTAINING WILL BE CONTINUED.__
+
+
+
+
 ## License
 
 Copyright © 2021 Instrumentisto Team, <https://github.com/instrumentisto>
