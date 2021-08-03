@@ -17,16 +17,6 @@ All user visible changes to this project will be documented in this file. This p
     - `ReconnectHandle.reconnect_with_backoff()` performs first reconnect attempt immediately now ([#206]).
 - JS error handling ([#214]):
     - Remove `JasonError`;
-    - Add exceptions:
-        - `StateError`;
-        - `LocalMediaInitException`;
-        - `EnumerateDevicesException`;
-        - `RpcClientException`;
-        - `InternalException`;
-        - `FormatException`;
-        - `MediaStateTransitionException`;
-        - `MediaSettingsUpdateException`;
-        - `ConstraintsUpdateException`.
     - Throw exceptions from functions:
         - `ConnectionHandle`:
             - `on_close` - `StateError`;
@@ -60,6 +50,16 @@ All user visible changes to this project will be documented in this file. This p
 
 - Library API:
     - Optional argument to `ReconnectHandle.reconnect_with_backoff()` function that limits max elapsed time ([#206]).
+- Exceptions ([#214]):
+    - `StateError`;
+    - `LocalMediaInitException`;
+    - `EnumerateDevicesException`;
+    - `RpcClientException`;
+    - `InternalException`;
+    - `FormatException`;
+    - `MediaStateTransitionException`;
+    - `MediaSettingsUpdateException`;
+    - `ConstraintsUpdateException`.
 
 [#206]: /../../pull/206
 [#214]: /../../pull/214
