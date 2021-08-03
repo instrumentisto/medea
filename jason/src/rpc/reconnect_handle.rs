@@ -8,15 +8,15 @@ use tracerr::Traced;
 use crate::{
     platform,
     rpc::{BackoffDelayer, RpcSession, SessionError},
-    utils::JsCaused,
+    utils::Caused,
 };
 
 /// Errors occurring in a [`ReconnectHandle`].
-#[derive(Clone, Debug, From, Display, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, From, Display, Caused)]
+#[cause(error = "platform::Error")]
 pub enum ReconnectError {
     /// Some [`SessionError`] has occurred while reconnecting.
-    Session(#[js(cause)] SessionError),
+    Session(#[cause] SessionError),
 
     /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
     #[display(fmt = "ReconnectHandle is in detached state")]

@@ -9,6 +9,7 @@ use web_sys as sys;
 
 use medea_jason::{
     api,
+    api::errors::{EnumerateDevicesException, LocalMediaInitException},
     media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, GetUserMediaError, InitLocalTracksError,
@@ -16,7 +17,10 @@ use medea_jason::{
     },
 };
 
-use crate::{get_jason_error, is_firefox, MockNavigator};
+use crate::{
+    get_enumerate_devices_exception, get_error, get_local_media_init_exception,
+    is_firefox, MockNavigator,
+};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -49,12 +53,11 @@ async fn failed_get_media_devices_info() {
     match result {
         Ok(_) => assert!(false),
         Err(err) => {
-            let e = get_jason_error(err);
-            assert_eq!(e.name(), "EnumerateDevicesError");
+            let e: EnumerateDevicesException =
+                get_enumerate_devices_exception(get_error(err).into());
             assert_eq!(
-                e.message(),
-                "MediaDevices.enumerateDevices() failed: Unknown JS error: \
-                 failed_get_media_devices_info",
+                e.cause().to_string(),
+                "Error: failed_get_media_devices_info",
             );
         }
     }
@@ -80,12 +83,11 @@ async fn failed_get_user_media() {
     match result {
         Ok(_) => assert!(false),
         Err(err) => {
-            let err = get_jason_error(err);
-            assert_eq!(err.name(), "GetUserMediaFailed");
+            let err: LocalMediaInitException =
+                get_local_media_init_exception(get_error(err).into());
             assert_eq!(
-                err.message(),
-                "Failed to get local tracks: MediaDevices.getUserMedia() \
-                 failed: Unknown JS error: failed_get_user_media",
+                err.cause().unwrap().to_string(),
+                "Error: failed_get_user_media",
             );
         }
     }
@@ -115,13 +117,11 @@ async fn failed_get_user_media2() {
     match result {
         Ok(_) => assert!(false),
         Err(err) => {
-            let err = get_jason_error(err);
-            assert_eq!(err.name(), "GetUserMediaFailed");
+            let err: LocalMediaInitException =
+                get_local_media_init_exception(get_error(err).into());
             assert_eq!(
-                err.message(),
-                "Failed to get local tracks: MediaDevices.getUserMedia() \
-                 failed: get_user_media_error_name: \
-                 get_user_media_error_message",
+                err.cause().unwrap().to_string(),
+                "get_user_media_error_name: get_user_media_error_message",
             );
         }
     }

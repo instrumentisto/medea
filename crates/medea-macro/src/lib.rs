@@ -7,9 +7,9 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
 #![forbid(non_ascii_idents, unsafe_code)]
 
+mod caused;
 mod dispatchable;
 mod enum_delegate;
-mod js_caused;
 mod watchers;
 
 use proc_macro::TokenStream;
@@ -374,62 +374,61 @@ pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
         .unwrap_or_else(|e| e.to_compile_error().into())
 }
 
-decl_derive!([JsCaused, attributes(js)] =>
-/// Generate implementation of `JsCaused` trait for errors represented as enum.
+decl_derive!([Caused, attributes(cause)] =>
+/// Generate implementation of `Caused` trait for errors represented as enum.
 ///
 /// # How to use
 ///
 /// ### 1. Declare wrapper for JS error and enum for error variants.
 ///
-/// The `js_cause()` method returns error if nested error has its type declared
-/// as an argument of the attribute `#[js(error = "path::to::Error")]` or
+/// The `cause()` method returns error if nested error has its type declared
+/// as an argument of the attribute `#[cause(error = "path::to::Error")]` or
 /// the error type is assumed to be imported as `JsError`.
 ///
 /// ```
-/// use medea_jason::utils::JsCaused;
+/// use medea_jason::utils::Caused;
 ///
 /// struct JsError;
 ///
-/// #[derive(JsCaused)]
+/// #[derive(Caused)]
+/// #[cause(error = "JsError")]
 /// enum FooError {
 ///     Internal,
 ///     Js(JsError),
 /// }
 ///
 /// let err = FooError::Internal;
-/// assert_eq!(err.name(), "Internal");
-/// assert!(err.js_cause().is_none());
+/// assert!(err.cause().is_none());
 ///
 /// let err = FooError::Js(JsError {});
-/// assert_eq!(err.name(), "Js");
-/// assert!(err.js_cause().is_some());
+/// assert!(err.cause().is_some());
 /// ```
 ///
-/// If enum variant has attribute `#[js(cause)]` it will call the `js_cause()`
+/// If enum variant has attribute `#[cause]` it will call the `cause()`
 /// method on nested error.
 ///
 /// ```
-/// # use medea_jason::utils::JsCaused;
+/// # use medea_jason::utils::Caused;
 /// #
 /// # struct JsError;
 /// #
-/// # #[derive(JsCaused)]
+/// # #[derive(Caused)]
+/// # #[cause(error = "JsError")]
 /// # enum FooError {
 /// #     Internal,
 /// #     Js(JsError),
 /// # }
 /// #
-/// #[derive(JsCaused)]
+/// #[derive(Caused)]
+/// #[cause(error = "JsError")]
 /// enum BarError {
-///     Foo(#[js(cause)] FooError),
+///     Foo(#[cause] FooError),
 /// }
 ///
 /// let err = BarError::Foo(FooError::Internal);
-/// assert_eq!(err.name(), "Foo");
-/// assert!(err.js_cause().is_none());
+/// assert!(err.cause().is_none());
 ///
 /// let err = BarError::Foo(FooError::Js(JsError {}));
-/// assert_eq!(err.name(), "Foo");
-/// assert!(err.js_cause().is_some());
+/// assert!(err.cause().is_some());
 /// ```
-js_caused::derive);
+caused::derive);

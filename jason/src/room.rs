@@ -37,7 +37,7 @@ use crate::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
-    utils::{AsProtoState, JsCaused},
+    utils::{AsProtoState, Caused},
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -103,11 +103,11 @@ impl RoomCloseReason {
 }
 
 /// Errors occurring in [`RoomHandle::join()`] method.
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum RoomJoinError {
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "Room is in detached state")]
+    #[display(fmt = "RoomHandle is in detached state")]
     Detached,
 
     /// Returned if the mandatory callback wasn't set.
@@ -121,23 +121,23 @@ pub enum RoomJoinError {
 
     /// [`RpcSession`] returned [`SessionError`].
     #[display(fmt = "WebSocketSession error occurred: {}", _0)]
-    SessionError(#[js(cause)] SessionError),
+    SessionError(#[cause] SessionError),
 }
 
 /// Error of [`RoomHandle`]'s [`Weak`] pointer being detached.
-#[derive(Clone, Debug, Display, Eq, From, JsCaused, PartialEq)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, Eq, From, Caused, PartialEq)]
+#[cause(error = "platform::Error")]
 pub struct HandleDetachedError;
 
 /// Errors occurring when changing media state of [`Sender`]s and [`Receiver`]s.
 ///
 /// [`Sender`]: peer::media::Sender
 /// [`Receiver`]: peer::media::Receiver
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum ChangeMediaStateError {
     /// [`RoomHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "Room is in detached state")]
+    #[display(fmt = "RoomHandle is in detached state")]
     Detached,
 
     /// Validating [`TracksRequest`] doesn't pass.
@@ -146,13 +146,13 @@ pub enum ChangeMediaStateError {
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
-    CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
+    CouldNotGetLocalMedia(#[cause] InitLocalTracksError),
 
     /// [`local::Track`]s cannot be inserted into [`Sender`]s of some
     /// [`PeerConnection`] in this [`Room`].
     ///
     /// [`Sender`]: peer::media::Sender
-    InsertLocalTracksError(#[js(cause)] InsertLocalTracksError),
+    InsertLocalTracksError(#[cause] InsertLocalTracksError),
 
     /// Requested state transition is not allowed by [`Sender`]'s settings.
     ///
@@ -195,8 +195,8 @@ impl From<UpdateLocalStreamError> for ChangeMediaStateError {
 
 /// Errors occurring when a [`Room`] tries to acquire [`local::Track`]s via
 /// [`MediaManager`].
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum GetLocalTracksError {
     /// Validating [`TracksRequest`] doesn't pass.
     ///
@@ -204,7 +204,7 @@ pub enum GetLocalTracksError {
     InvalidLocalTracks(TracksRequestError),
 
     /// [`MediaManager`] failed to acquire [`local::Track`]s.
-    CouldNotGetLocalMedia(#[js(cause)] InitLocalTracksError),
+    CouldNotGetLocalMedia(#[cause] InitLocalTracksError),
 }
 
 macro_rules! upgrade_inner {

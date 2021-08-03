@@ -23,7 +23,7 @@ impl ConnectionHandle {
         self.0
             .on_close(cb.into())
             .map_err(api::Error::from)
-            .map_err(JsValue::from)
+            .map_err(Into::into)
     }
 
     /// Returns ID of the remote `Member`.
@@ -31,7 +31,7 @@ impl ConnectionHandle {
         self.0
             .get_remote_member_id()
             .map_err(api::Error::from)
-            .map_err(JsValue::from)
+            .map_err(Into::into)
     }
 
     /// Sets callback, invoked when a new [`RemoteMediaTrack`] is added to this
@@ -46,7 +46,7 @@ impl ConnectionHandle {
         self.0
             .on_remote_track_added(cb.into())
             .map_err(api::Error::from)
-            .map_err(JsValue::from)
+            .map_err(Into::into)
     }
 
     /// Sets callback, invoked when connection quality score is updated by a
@@ -58,6 +58,6 @@ impl ConnectionHandle {
         self.0
             .on_quality_score_update(cb.into())
             .map_err(api::Error::from)
-            .map_err(JsValue::from)
+            .map_err(Into::into)
     }
 }

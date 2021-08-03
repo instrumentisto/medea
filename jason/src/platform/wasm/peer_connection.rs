@@ -125,7 +125,7 @@ impl RtcPeerConnection {
         peer_conf.ice_transport_policy(policy);
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
-            .map_err(Into::into)
+            .map_err(platform::error::from)
             .map_err(RtcPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
@@ -154,7 +154,7 @@ impl RtcPeerConnection {
         let js_stats =
             JsFuture::from(self.peer.get_stats()).await.map_err(|e| {
                 tracerr::new!(RtcPeerConnectionError::GetStatsException(
-                    platform::Error::from(e)
+                    platform::error::from(e)
                 ))
             })?;
 
@@ -385,7 +385,7 @@ impl RtcPeerConnection {
             ),
         )
         .await
-        .map_err(Into::into)
+        .map_err(platform::error::from)
         .map_err(RtcPeerConnectionError::AddIceCandidateFailed)
         .map_err(tracerr::wrap!())?;
         Ok(())
@@ -421,7 +421,7 @@ impl RtcPeerConnection {
 
         JsFuture::from(peer.set_local_description(&desc))
             .await
-            .map_err(Into::into)
+            .map_err(platform::error::from)
             .map_err(RtcPeerConnectionError::SetLocalDescriptionFailed)
             .map_err(tracerr::wrap!())?;
 
@@ -470,7 +470,7 @@ impl RtcPeerConnection {
     pub async fn create_answer(&self) -> Result<String> {
         let answer = JsFuture::from(self.peer.create_answer())
             .await
-            .map_err(Into::into)
+            .map_err(platform::error::from)
             .map_err(RtcPeerConnectionError::CreateAnswerFailed)
             .map_err(tracerr::wrap!())?;
         let answer = RtcSessionDescription::from(answer).sdp();
@@ -494,7 +494,7 @@ impl RtcPeerConnection {
             &RtcSessionDescriptionInit::new(RtcSdpType::Rollback),
         ))
         .await
-        .map_err(Into::into)
+        .map_err(platform::error::from)
         .map_err(RtcPeerConnectionError::SetLocalDescriptionFailed)
         .map_err(tracerr::wrap!())?;
 
@@ -524,7 +524,7 @@ impl RtcPeerConnection {
             peer.create_offer_with_rtc_offer_options(&offer_options),
         )
         .await
-        .map_err(Into::into)
+        .map_err(platform::error::from)
         .map_err(RtcPeerConnectionError::CreateOfferFailed)
         .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
@@ -562,7 +562,7 @@ impl RtcPeerConnection {
 
         JsFuture::from(self.peer.set_remote_description(&description))
             .await
-            .map_err(Into::into)
+            .map_err(platform::error::from)
             .map_err(RtcPeerConnectionError::SetRemoteDescriptionFailed)
             .map_err(tracerr::wrap!())?;
 

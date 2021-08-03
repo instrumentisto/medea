@@ -10,7 +10,7 @@ use derive_more::Display;
 use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use tracerr::Traced;
 
-use crate::{api, media::track::remote, platform, utils::JsCaused};
+use crate::{api, media::track::remote, platform, utils::Caused};
 
 /// Service which manages [`Connection`]s with remote `Member`s.
 #[derive(Default)]
@@ -85,10 +85,10 @@ impl Connections {
 }
 
 /// Error of [`ConnectionHandle`]'s [`Weak`] pointer being detached.
-#[derive(Clone, Copy, Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Copy, Debug, Display, Caused)]
+#[cause(error = "platform::Error")]
 #[display(fmt = "ConnectionHandle is in detached state")]
-pub struct HandlerDetachedError;
+pub struct HandleDetachedError;
 
 /// External handler to a [`Connection`] with a remote `Member`.
 ///
@@ -120,14 +120,14 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// See [`HandlerDetachedError`] for details.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_close(
         &self,
         f: platform::Function<()>,
-    ) -> Result<(), Traced<HandlerDetachedError>> {
+    ) -> Result<(), Traced<HandleDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
+            .ok_or_else(|| tracerr::new!(HandleDetachedError))
             .map(|inner| inner.on_close.set_func(f))
     }
 
@@ -135,13 +135,13 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// See [`HandlerDetachedError`] for details.
+    /// See [`HandleDetachedError`] for details.
     pub fn get_remote_member_id(
         &self,
-    ) -> Result<String, Traced<HandlerDetachedError>> {
+    ) -> Result<String, Traced<HandleDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
+            .ok_or_else(|| tracerr::new!(HandleDetachedError))
             .map(|inner| inner.remote_id.0.clone())
     }
 
@@ -150,14 +150,14 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// See [`HandlerDetachedError`] for details.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
-    ) -> Result<(), Traced<HandlerDetachedError>> {
+    ) -> Result<(), Traced<HandleDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
+            .ok_or_else(|| tracerr::new!(HandleDetachedError))
             .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
@@ -166,14 +166,14 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// See [`HandlerDetachedError`] for details.
+    /// See [`HandleDetachedError`] for details.
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,
-    ) -> Result<(), Traced<HandlerDetachedError>> {
+    ) -> Result<(), Traced<HandleDetachedError>> {
         self.0
             .upgrade()
-            .ok_or_else(|| tracerr::new!(HandlerDetachedError))
+            .ok_or_else(|| tracerr::new!(HandleDetachedError))
             .map(|inner| inner.on_quality_score_update.set_func(f))
     }
 }

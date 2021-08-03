@@ -238,8 +238,8 @@ void main() {
         () => conn.getRemoteMemberId(),
         throwsA(allOf(
             isStateError,
-            predicate((e) =>
-                e.message == 'ConnectionHandle is in detached state.'))));
+            predicate(
+                (e) => e.message == 'ConnectionHandle is in detached state'))));
     var allFired = List<Completer>.generate(2, (_) => Completer());
     conn.onQualityScoreUpdate((score) {
       allFired[0].complete(score);
@@ -326,7 +326,7 @@ void main() {
     expect(
         stateErr,
         allOf(isStateError,
-            predicate((e) => e.message == 'RoomHandle is in detached state.')));
+            predicate((e) => e.message == 'RoomHandle is in detached state')));
 
     var formatExc;
     try {

@@ -31,14 +31,14 @@ impl TryFrom<&JsValue> for RtcStats {
 
         let iterator = entries_fn
             .call0(stats.as_ref())
-            .map_err(|e| tracerr::new!(Platform(platform::Error::from(e))))?
+            .map_err(|e| tracerr::new!(Platform(platform::error::from(e))))?
             .unchecked_into::<JsIterator>();
 
         let mut stats = Vec::new();
 
         for stat in iterator {
             let stat = stat.map_err(|e| {
-                tracerr::new!(Platform(platform::Error::from(e)))
+                tracerr::new!(Platform(platform::error::from(e)))
             })?;
             let stat = stat.unchecked_into::<JsArray>();
             let stat = RtcStatsReportEntry::try_from(stat)
@@ -80,10 +80,10 @@ impl TryFrom<JsArray> for RtcStatsReportEntry {
 
         let id = id
             .dyn_into::<JsString>()
-            .map_err(|e| tracerr::new!(Platform(platform::Error::from(e))))?;
+            .map_err(|e| tracerr::new!(Platform(platform::error::from(e))))?;
         let stats = stats
             .dyn_into::<JsValue>()
-            .map_err(|e| tracerr::new!(Platform(platform::Error::from(e))))?;
+            .map_err(|e| tracerr::new!(Platform(platform::error::from(e))))?;
 
         Ok(RtcStatsReportEntry(id, stats))
     }

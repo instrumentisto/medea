@@ -10,22 +10,13 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, ArgumentError, DartFuture, DartResult,
-            FormatException, InternalException, IntoDartFuture as _,
-            MediaSettingsUpdateException, MediaStateTransitionException,
-            StateError,
+            IntoDartFuture as _,
         },
         DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
-    peer::{
-        media::sender::CreateError, InsertLocalTracksError, LocalMediaError,
-        UpdateLocalStreamError,
-    },
     platform,
-    room::{
-        ChangeMediaStateError, ConstraintsUpdateError, HandleDetachedError,
-        RoomJoinError,
-    },
+    room::{ChangeMediaStateError, ConstraintsUpdateError, RoomJoinError},
 };
 
 use super::{utils::DartError, MediaStreamSettings};
@@ -36,107 +27,6 @@ pub use self::mock::RoomHandle;
 pub use crate::room::RoomHandle;
 
 impl ForeignClass for RoomHandle {}
-
-impl From<Traced<HandleDetachedError>> for DartError {
-    #[inline]
-    fn from(_: Traced<HandleDetachedError>) -> Self {
-        StateError::new("ReconnectHandle is in detached state.").into()
-    }
-}
-
-impl From<Traced<RoomJoinError>> for DartError {
-    #[inline]
-    fn from(err: Traced<RoomJoinError>) -> Self {
-        let (err, trace) = err.into_parts();
-        let message = err.to_string();
-
-        match err {
-            RoomJoinError::Detached | RoomJoinError::CallbackNotSet(_) => {
-                StateError::new(message).into()
-            }
-            RoomJoinError::ConnectionInfoParse(_) => {
-                FormatException::new(message).into()
-            }
-            RoomJoinError::SessionError(err) => {
-                Traced::from_parts(err, trace).into()
-            }
-        }
-    }
-}
-
-impl From<Traced<LocalMediaError>> for DartError {
-    fn from(err: Traced<LocalMediaError>) -> Self {
-        use InsertLocalTracksError as IE;
-        use LocalMediaError as ME;
-        use UpdateLocalStreamError as UE;
-
-        let (err, trace) = err.into_parts();
-        let message = err.to_string();
-
-        match err {
-            ME::UpdateLocalStreamError(err) => match err {
-                UE::CouldNotGetLocalMedia(err) => {
-                    Traced::from_parts(err, trace).into()
-                }
-                UE::InvalidLocalTracks(_)
-                | UE::InsertLocalTracksError(
-                    IE::InvalidMediaTrack | IE::NotEnoughTracks,
-                ) => MediaStateTransitionException::new(message, trace).into(),
-                UE::InsertLocalTracksError(IE::CouldNotInsertLocalTrack(_)) => {
-                    InternalException::new(message, None, trace).into()
-                }
-            },
-            ME::SenderCreateError(CreateError::TransceiverNotFound(_)) => {
-                InternalException::new(message, None, trace).into()
-            }
-            ME::SenderCreateError(CreateError::CannotDisableRequiredSender) => {
-                MediaStateTransitionException::new(message, trace).into()
-            }
-        }
-    }
-}
-
-impl From<Traced<ChangeMediaStateError>> for DartError {
-    #[inline]
-    fn from(err: Traced<ChangeMediaStateError>) -> Self {
-        let (err, trace) = err.into_parts();
-        let message = err.to_string();
-
-        match err {
-            ChangeMediaStateError::Detached => {
-                StateError::new("RoomHandle is in detached state.").into()
-            }
-            ChangeMediaStateError::CouldNotGetLocalMedia(err) => {
-                Traced::from_parts(err, trace).into()
-            }
-            ChangeMediaStateError::ProhibitedState(_)
-            | ChangeMediaStateError::TransitionIntoOppositeState(_)
-            | ChangeMediaStateError::InvalidLocalTracks(_) => {
-                MediaStateTransitionException::new(message, trace).into()
-            }
-            ChangeMediaStateError::InsertLocalTracksError(_) => {
-                InternalException::new(message, None, trace).into()
-            }
-        }
-    }
-}
-
-impl From<ConstraintsUpdateError> for DartError {
-    #[inline]
-    fn from(err: ConstraintsUpdateError) -> Self {
-        let message = err.to_string();
-
-        let (err, rolled_back) = match err {
-            ConstraintsUpdateError::Recovered(err) => (err, true),
-            ConstraintsUpdateError::RecoverFailed {
-                recover_reason, ..
-            } => (recover_reason, false),
-            ConstraintsUpdateError::Errored(err) => (err, false),
-        };
-
-        MediaSettingsUpdateException::new(message, err, rolled_back).into()
-    }
-}
 
 /// Connects to a media server and joins the [`Room`] with the provided
 /// authorization `token`.

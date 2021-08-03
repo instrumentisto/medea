@@ -13,6 +13,7 @@ use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     platform::{
+        self,
         transport::{RpcTransport, TransportError, TransportState},
         wasm::utils::EventListener,
     },
@@ -81,7 +82,7 @@ struct InnerSocket {
 impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
         let socket = SysWebSocket::new(&url)
-            .map_err(Into::into)
+            .map_err(platform::error::from)
             .map_err(TransportError::CreateSocket)
             .map_err(tracerr::wrap!())?;
         Ok(Self {
@@ -259,7 +260,7 @@ impl RpcTransport for WebSocketRpcTransport {
             TransportState::Open => inner
                 .socket
                 .send_with_str(&message)
-                .map_err(Into::into)
+                .map_err(platform::error::from)
                 .map_err(TransportError::SendMessage)
                 .map_err(tracerr::wrap!()),
             _ => Err(tracerr::new!(TransportError::ClosedSocket)),

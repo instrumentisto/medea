@@ -15,7 +15,7 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 use url::Url;
 
-use crate::{platform, utils::JsCaused};
+use crate::{platform, utils::Caused};
 
 #[cfg(feature = "mockable")]
 pub use self::rpc_session::MockRpcSession;
@@ -83,8 +83,8 @@ impl ConnectionInfo {
 }
 
 /// Errors which can occur while [`ConnectionInfo`] parsing from the [`str`].
-#[derive(Clone, Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, Caused)]
+#[cause(error = "platform::Error")]
 pub enum ConnectionInfoParseError {
     /// [`Url::parse`] returned error.
     #[display(fmt = "Failed to parse provided URL: {}", _0)]
@@ -198,12 +198,12 @@ pub enum ConnectionLostReason {
 }
 
 /// Errors that may occur in [`WebSocketRpcClient`].
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
-    RpcTransportError(#[js(cause)] platform::TransportError),
+    RpcTransportError(#[cause] platform::TransportError),
 
     /// Occurs if [`Weak`] pointer to the [`WebSocketRpcClient`] can't be
     /// upgraded to [`Rc`].

@@ -34,7 +34,7 @@ fragile = { version = "1.0", optional = true }
 futures = "0.3"
 log = "0.4"
 medea-client-api-proto = { version = "0.3", features = ["jason"] }
-medea-macro = "0.2"
+medea-macro = { path = "../crates/medea-macro" }
 medea-reactive = "0.1"
 mockall = { version = "0.10", optional = true }
 predicates-tree = { version = "1.0", optional = true }

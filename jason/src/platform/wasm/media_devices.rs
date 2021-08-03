@@ -8,7 +8,7 @@ use wasm_bindgen_futures::JsFuture;
 use tracerr::Traced;
 
 use crate::platform::{
-    DisplayMediaStreamConstraints, Error, InputDeviceInfo,
+    self, DisplayMediaStreamConstraints, Error, InputDeviceInfo,
     MediaStreamConstraints, MediaStreamTrack,
 };
 
@@ -35,16 +35,16 @@ pub async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>, Traced<Error>>
     let devices = window()
         .navigator()
         .media_devices()
-        .map_err(Error::from)
+        .map_err(platform::error::from)
         .map_err(tracerr::wrap!())?;
     let devices = JsFuture::from(
         devices
             .enumerate_devices()
-            .map_err(Error::from)
+            .map_err(platform::error::from)
             .map_err(tracerr::wrap!())?,
     )
     .await
-    .map_err(Error::from)
+    .map_err(platform::error::from)
     .map_err(tracerr::wrap!())?;
 
     Ok(js_sys::Array::from(&devices)
@@ -80,18 +80,18 @@ pub async fn get_user_media(
     let media_devices = window()
         .navigator()
         .media_devices()
-        .map_err(Error::from)
+        .map_err(platform::error::from)
         .map_err(tracerr::wrap!())?;
 
     let stream = JsFuture::from(
         media_devices
             .get_user_media_with_constraints(&caps.into())
-            .map_err(Error::from)
+            .map_err(platform::error::from)
             .map_err(tracerr::wrap!())?,
     )
     .await
     .map(web_sys::MediaStream::from)
-    .map_err(Error::from)
+    .map_err(platform::error::from)
     .map_err(tracerr::wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())
@@ -125,18 +125,18 @@ pub async fn get_display_media(
     let media_devices = window()
         .navigator()
         .media_devices()
-        .map_err(Error::from)
+        .map_err(platform::error::from)
         .map_err(tracerr::wrap!())?;
 
     let stream = JsFuture::from(
         media_devices
             .get_display_media_with_constraints(&caps.into())
-            .map_err(Error::from)
+            .map_err(platform::error::from)
             .map_err(tracerr::wrap!())?,
     )
     .await
     .map(web_sys::MediaStream::from)
-    .map_err(Error::from)
+    .map_err(platform::error::from)
     .map_err(tracerr::wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())

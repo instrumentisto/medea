@@ -4,13 +4,13 @@ use std::rc::Rc;
 
 use derive_more::{Display, From};
 
-use crate::{platform, utils::JsCaused};
+use crate::{platform, utils::Caused};
 
 /// Errors which can occur during deserialization of a [`RtcStatsType`].
 ///
 /// [`RtcStatsType`]: medea_client_api_proto::stats::RtcStatsType
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum RtcStatsError {
     /// [RTCStats.id][1] is undefined.
     ///
@@ -25,7 +25,7 @@ pub enum RtcStatsError {
     UndefinedStats,
 
     /// Some platform error occurred.
-    #[display(fmt = "Unexpected platform error: {}", _0)]
+    #[display(fmt = "Unexpected platform error: {:?}", _0)]
     Platform(platform::Error),
 
     /// `RTCStats.entries` are undefined.

@@ -27,12 +27,12 @@ use crate::{
         websocket::RpcEventHandler, ClientDisconnect, CloseReason,
         ConnectionInfo, RpcClientError, WebSocketRpcClient,
     },
-    utils::JsCaused,
+    utils::Caused,
 };
 
 /// Errors which can be returned from the [`WebSocketRpcSession`].
-#[derive(Clone, Debug, From, JsCaused, Display)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, From, Caused, Display)]
+#[cause(error = "platform::Error")]
 pub enum SessionError {
     /// [`WebSocketRpcSession`] goes into [`SessionState::Finished`] and can't
     /// be used.
@@ -51,7 +51,7 @@ pub enum SessionError {
 
     /// [`WebSocketRpcClient`] returned [`RpcClientError`].
     #[display(fmt = "RpcClientError: {:?}", _0)]
-    RpcClient(#[js(cause)] RpcClientError),
+    RpcClient(#[cause] RpcClientError),
 
     /// [`WebSocketRpcSession`] was unexpectedly dropped.
     #[display(fmt = "RPC Session was unexpectedly dropped")]
@@ -69,7 +69,8 @@ pub enum SessionError {
 }
 
 /// Reason of why a [`RpcSession`] lost connection with a server.
-#[derive(Clone, Debug, Display)]
+#[derive(Clone, Debug, Display, Caused)]
+#[cause(error = "platform::Error")]
 pub enum ConnectionLostReason {
     /// Connection could not be established because
     /// [`WebSocketRpcClient::connect()`] failed.
@@ -77,28 +78,6 @@ pub enum ConnectionLostReason {
 
     /// Underlying [`WebSocketRpcClient`] reported that connection was lost.
     Lost(super::ConnectionLostReason),
-}
-
-impl JsCaused for ConnectionLostReason {
-    type Error = platform::Error;
-
-    #[inline]
-    fn name(&self) -> &'static str {
-        match self {
-            ConnectionLostReason::ConnectError(_) => "ConnectError",
-            ConnectionLostReason::Lost(_) => "Lost",
-        }
-    }
-
-    #[inline]
-    fn js_cause(self) -> Option<Self::Error> {
-        match self {
-            ConnectionLostReason::ConnectError(err) => {
-                err.into_inner().js_cause()
-            }
-            ConnectionLostReason::Lost(_) => None,
-        }
-    }
 }
 
 /// Client to talk with server via Client API RPC.

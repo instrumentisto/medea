@@ -3,11 +3,11 @@ use std::{marker::PhantomData, rc::Rc};
 use derive_more::{Display, From};
 use tracerr::Traced;
 
-use crate::{platform, utils::JsCaused};
+use crate::{platform, utils::Caused};
 
 /// Failure to bind a listener to some event.
-#[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused, PartialEq)]
+#[cause(error = "platform::Error")]
 pub struct EventListenerBindError(platform::Error);
 
 /// Wrapper for the closure that handles some event.

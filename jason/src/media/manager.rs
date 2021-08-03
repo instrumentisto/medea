@@ -16,20 +16,20 @@ use crate::{
         MultiSourceTracksConstraints,
     },
     platform,
-    utils::JsCaused,
+    utils::Caused,
 };
 
 use super::track::local;
 
 /// Errors returned from the [`MediaManagerHandle::enumerate_devices()`] method.
-#[derive(Clone, Debug, Display, From, JsCaused, Into)]
-#[js(error = "platform::Error")]
-#[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
+#[derive(Clone, Debug, Display, From, Caused, Into)]
+#[cause(error = "platform::Error")]
+#[display(fmt = "MediaDevices.enumerateDevices() failed: {:?}", _0)]
 pub struct EnumerateDevicesError(platform::Error);
 
 /// Errors returned from the [`MediaManagerHandle::init_local_tracks()`] method.
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum InitLocalTracksError {
     /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be upgraded.
     #[display(fmt = "MediaManagerHandle is in detached state")]
@@ -39,13 +39,13 @@ pub enum InitLocalTracksError {
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[display(fmt = "Failed to get local tracks: {}", _0)]
-    GetUserMediaFailed(#[js(cause)] GetUserMediaError),
+    GetUserMediaFailed(#[cause] GetUserMediaError),
 
     /// Occurs if the [getDisplayMedia()][1] request fails.
     ///
     /// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     #[display(fmt = "Failed to get local tracks: {}", _0)]
-    GetDisplayMediaFailed(#[js(cause)] GetDisplayMediaError),
+    GetDisplayMediaFailed(#[cause] GetDisplayMediaError),
 }
 
 /// Error occurring when [`local::Track`] was [`ended`][1] right after
@@ -61,13 +61,13 @@ struct LocalTrackIsEndedError(MediaKind);
 /// Errors occurring when [getUserMedia()][1] request fails.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum GetUserMediaError {
     /// [getUserMedia()][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
+    #[display(fmt = "MediaDevices.getUserMedia() failed: {:?}", _0)]
     PlatformRequestFailed(platform::Error),
 
     /// [`local::Track`] was [`ended`][1] right after [getUserMedia()][2] or
@@ -90,13 +90,13 @@ impl From<LocalTrackIsEndedError> for GetUserMediaError {
 /// Error occurring when [getDisplayMedia()][1] request fails.
 ///
 /// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
+#[derive(Clone, Debug, Display, From, Caused)]
+#[cause(error = "platform::Error")]
 pub enum GetDisplayMediaError {
     /// [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
+    #[display(fmt = "MediaDevices.getDisplayMedia() failed: {:?}", _0)]
     PlatformRequestFailed(platform::Error),
 
     /// [`local::Track`] was [`ended`][1] right after [getUserMedia()][2] or

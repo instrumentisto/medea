@@ -9,7 +9,7 @@ use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{
     media::track::local,
-    platform::{transceiver::TransceiverDirection, Error},
+    platform::{self, transceiver::TransceiverDirection, Error},
 };
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
@@ -69,7 +69,8 @@ impl Transceiver {
         JsFuture::from(
             self.transceiver.sender().replace_track(Some(sys_track)),
         )
-        .await?;
+        .await
+        .map_err(platform::error::from)?;
         self.send_track.replace(Some(new_track));
         Ok(())
     }
