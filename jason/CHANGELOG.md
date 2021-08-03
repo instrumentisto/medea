@@ -12,11 +12,49 @@ All user visible changes to this project will be documented in this file. This p
 [Diff](/../../compare/medea-jason-0.2.0...medea-jason-0.3.0) | [Milestone](/../../milestone/3) | [Roadmap](/../../issues/182)
 
 ### BC Breaks
-- Library API:
+
+- JS API:
     - `ReconnectHandle.reconnect_with_backoff()` performs first reconnect attempt immediately now ([#206]).
-- Error handling ([#214]):
+- JS error handling ([#214]):
     - Remove `JasonError`;
-    - Throw errors of the concrete types from Jason.
+    - Add exceptions:
+        - `StateError`;
+        - `LocalMediaInitException`;
+        - `EnumerateDevicesException`;
+        - `RpcClientException`;
+        - `InternalException`;
+        - `FormatException`;
+        - `MediaStateTransitionException`;
+        - `MediaSettingsUpdateException`;
+        - `ConstraintsUpdateException`.
+    - Throw exceptions from functions:
+        - `ConnectionHandle`:
+            - `on_close` - `StateError`;
+            - `get_remote_member_id` - `StateError`;
+            - `on_remote_track_added` - `StateError`;
+            - `on_quality_score_update` - `StateError`.
+        - `MediaManager`:
+            - `enumerate_devices` - `EnumerateDevicesException`.
+            - `init_local_tracks` - `LocalMediaInitException`.
+        - `RoomHandle`:
+            - `join`:
+                - `StateError`;
+                - `FormatException`;
+                - `RpcClientException`;
+                - `InternalException`.
+            - `on_new_connection` - `StateError`;
+            - `on_close` - `StateError`;
+            - `on_local_track` - `StateError`;
+            - `on_failed_local_media` - `StateError`;
+            - `on_connection_loss` - `StateError`;
+            - `set_local_media_settings` - `ConstraintsUpdateException`;
+            - `mute_audio`, `unmute_audio`, `mute_video`, `unmute_video`, `disable_audio`, `enable_audio`,
+              `disable_video`, `enable_video`, `disable_remote_video`, `enable_remote_video`, `disable_remote_audio`,
+              `enable_remote_audio`:
+                - `StateError`;
+                - `MediaStateTransitionException`;
+                - `InternalException`;
+                - `LocalMediaInitException`.
 
 ### Added
 
@@ -186,7 +224,7 @@ All user visible changes to this project will be documented in this file. This p
 - Ability to use ICE servers provided by server ([#20](/../../pull/20)).
 - Signalling ([#22](/../../pull/22)):
     - Library API:
-       - `RoomHandle.on_new_connection` callback.
+        - `RoomHandle.on_new_connection` callback.
     - Handling of RPC events:
         - `PeerCreated`;
         - `SdpAnswerMade`;
