@@ -315,7 +315,7 @@ impl WebSocketRpcClient {
                     log::error!(
                         "Failed to update socket settings because Heartbeat is \
                          None",
-                    )
+                    );
                 }
                 None
             }
@@ -425,7 +425,7 @@ impl WebSocketRpcClient {
         platform::spawn(async move {
             while let Some(msg) = on_socket_message.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    this.on_transport_message(msg)
+                    this.on_transport_message(msg);
                 }
             }
         });
@@ -555,7 +555,7 @@ impl WebSocketRpcClient {
     /// dropped.
     #[inline]
     pub fn set_close_reason(&self, close_reason: ClientDisconnect) {
-        self.0.borrow_mut().close_reason = close_reason
+        self.0.borrow_mut().close_reason = close_reason;
     }
 }
 

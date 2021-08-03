@@ -163,7 +163,7 @@ impl StreamHandler<redis::Msg> for CoturnMetricsService {
                         event.room_id,
                         event.peer_id,
                         FlowMetricSource::Coturn,
-                    )
+                    );
                 }
             }
             CoturnAllocationEvent::Deleted => {

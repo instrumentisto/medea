@@ -346,7 +346,7 @@ impl Component {
     ) -> Result<(), Infallible> {
         receiver.muted.set(muted);
         if let Some(track) = receiver.track.borrow().as_ref() {
-            track.set_muted(muted)
+            track.set_muted(muted);
         }
         Ok(())
     }

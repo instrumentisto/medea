@@ -1,6 +1,6 @@
 //! Media tracks and streams constraints functionality.
 
-use derive_more::{AsRef, Into};
+use derive_more::AsRef;
 
 use crate::media::{
     AudioTrackConstraints, DeviceVideoTrackConstraints,
@@ -10,7 +10,7 @@ use crate::media::{
 /// [MediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(AsRef, Debug, Into)]
+#[derive(AsRef, Debug)]
 pub struct MediaStreamConstraints;
 
 impl MediaStreamConstraints {
@@ -49,7 +49,7 @@ impl Default for MediaStreamConstraints {
 /// [DisplayMediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-displaymediastreamconstraints
-#[derive(AsRef, Debug, Into)]
+#[derive(AsRef, Debug)]
 pub struct DisplayMediaStreamConstraints();
 
 impl Default for DisplayMediaStreamConstraints {

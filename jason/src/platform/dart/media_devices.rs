@@ -20,6 +20,7 @@ use crate::platform::{
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-enumeratedevices
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
+#[allow(clippy::unused_async)]
 pub async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>, Traced<Error>>
 {
     unimplemented!()
@@ -37,6 +38,7 @@ pub async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>, Traced<Error>>
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
+#[allow(clippy::unused_async)]
 pub async fn get_user_media(
     caps: MediaStreamConstraints,
 ) -> Result<Vec<MediaStreamTrack>, Traced<Error>> {
@@ -56,6 +58,7 @@ pub async fn get_user_media(
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
+#[allow(clippy::unused_async)]
 pub async fn get_display_media(
     caps: DisplayMediaStreamConstraints,
 ) -> Result<Vec<MediaStreamTrack>, Traced<Error>> {

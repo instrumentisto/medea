@@ -370,7 +370,7 @@ impl Handler<Delete> for Room {
             }
         }
         for fid in member_ids {
-            self.delete_member(&fid.member_id(), ctx);
+            self.delete_member(fid.member_id(), ctx);
         }
         for fid in endpoint_ids {
             let (_, member_id, endpoint_id) = fid.take_all();
@@ -455,7 +455,7 @@ impl Handler<Apply> for Room {
         let mut create_sink_endpoint = Vec::new();
         for (id, element) in &msg.0.pipeline {
             let spec = MemberSpec::try_from(element)?;
-            if let Ok(member) = self.members.get_member(&id) {
+            if let Ok(member) = self.members.get_member(id) {
                 for (src_id, _) in member.srcs() {
                     if spec.get_publish_endpoint_by_id(src_id.clone()).is_none()
                     {

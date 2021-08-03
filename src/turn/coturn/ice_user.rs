@@ -81,7 +81,7 @@ impl CoturnIceUser {
     ) -> Self {
         Self {
             address,
-            user: IceUsername::new(&room_id, peer_id),
+            user: IceUsername::new(room_id, peer_id),
             pass,
             on_drop: Some(on_drop),
         }

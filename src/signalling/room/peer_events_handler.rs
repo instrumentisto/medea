@@ -82,7 +82,7 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
     /// [`Peer`] with the provided `peer_id` has stopped.
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
-            addr.do_send(PeerStopped { peer_id, at })
+            addr.do_send(PeerStopped { peer_id, at });
         }
     }
 }

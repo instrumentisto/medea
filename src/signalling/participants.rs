@@ -209,7 +209,7 @@ impl ParticipantService {
     /// Sends the given [`Event`] to the specified remote [`Member`] if its
     /// [`RpcConnection`] exists.
     pub fn send_event_to_member(&self, member_id: &MemberId, event: Event) {
-        if let Some(conn) = self.connections.get(&member_id) {
+        if let Some(conn) = self.connections.get(member_id) {
             conn.send_event(self.room_id.clone(), event);
         } else {
             debug!(
@@ -288,7 +288,7 @@ impl ParticipantService {
                     ctx.notify(RpcConnectionClosed {
                         member_id,
                         reason: ClosedReason::Closed { normal: false },
-                    })
+                    });
                 }),
             );
         }

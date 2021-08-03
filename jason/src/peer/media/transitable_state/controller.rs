@@ -235,9 +235,9 @@ where
     pub fn when_stabilized(self: Rc<Self>) -> Processed<'static, ()> {
         Processed::new(Box::new(move || {
             let stable = self.subscribe_stable();
-            Box::pin(
-                async move { stable.fuse().select_next_some().map(drop).await },
-            )
+            Box::pin(async move {
+                stable.fuse().select_next_some().map(drop).await;
+            })
         }))
     }
 

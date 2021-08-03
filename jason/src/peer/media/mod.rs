@@ -631,7 +631,7 @@ impl MediaConnections {
         {
             if let Some(mid) = receiver.mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
-                    receiver.replace_transceiver(trnscvr)
+                    receiver.replace_transceiver(trnscvr);
                 }
             }
         }

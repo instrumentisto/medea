@@ -538,7 +538,7 @@ impl DeleteElements<Unvalidated> {
     /// Adds [`StatefulFid`] to request.
     #[inline]
     pub fn add_fid(&mut self, fid: StatefulFid) {
-        self.fids.push(fid)
+        self.fids.push(fid);
     }
 
     /// Validates request. It must have at least one fid, all fids must share

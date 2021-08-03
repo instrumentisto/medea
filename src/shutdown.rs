@@ -157,7 +157,7 @@ impl Handler<OsSignal> for GracefulShutdown {
             } else {
                 error!("Graceful shutdown has timed out, stopping system");
             }
-            System::current().stop()
+            System::current().stop();
         }
         .boxed_local()
     }

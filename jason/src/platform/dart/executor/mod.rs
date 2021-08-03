@@ -72,7 +72,7 @@ pub unsafe extern "C" fn rust_executor_poll_task(
 /// specific [`Task`].
 #[no_mangle]
 pub unsafe extern "C" fn rust_executor_drop_task(task: ptr::NonNull<Task>) {
-    drop(Rc::from_raw(task.as_ptr()))
+    drop(Rc::from_raw(task.as_ptr()));
 }
 
 /// Commands an external Dart executor to poll the provided [`Task`].
@@ -94,6 +94,8 @@ fn task_wake(task: ptr::NonNull<Task>) {
         unsafe { Dart_PostCObject_DL_Trampolined(wake_port, &mut task_addr) };
     if !enqueued {
         log::warn!("Could not send message to Dart's native port");
-        unsafe { rust_executor_drop_task(task) };
+        unsafe {
+            rust_executor_drop_task(task);
+        }
     }
 }

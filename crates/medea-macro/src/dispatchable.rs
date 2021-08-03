@@ -330,7 +330,7 @@ pub fn expand(item: Item, args: &Args) -> TokenStream {
 
     let handler_kind = args.dispatch_with_handler_arg();
     let method_doc = item.dispatch_with_method_doc();
-    let handler_trait = item.handler_trait(&args);
+    let handler_trait = item.handler_trait(args);
     let maybe_async = args.maybe_async_token();
     let maybe_await = args.maybe_await_token();
     let orig_enum = item.orig_enum;

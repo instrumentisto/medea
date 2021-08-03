@@ -41,12 +41,12 @@ impl RemoteMediaTrack {
 
     /// Sets callback, invoked when this [`RemoteMediaTrack`] is enabled.
     pub fn on_enabled(&self, cb: js_sys::Function) {
-        self.0.on_enabled(cb.into())
+        self.0.on_enabled(cb.into());
     }
 
     /// Sets callback, invoked when this [`RemoteMediaTrack`] is disabled.
     pub fn on_disabled(&self, cb: js_sys::Function) {
-        self.0.on_disabled(cb.into())
+        self.0.on_disabled(cb.into());
     }
 
     /// Sets callback to invoke when this [`RemoteMediaTrack`] is muted.

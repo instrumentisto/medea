@@ -65,7 +65,7 @@ impl From<Traced<SessionError>> for DartError {
             SE::AuthorizationFailed => Some(Kind::AuthorizationFailed),
             SE::ConnectionLost(reason) => {
                 if let Reason::ConnectError(err) = reason {
-                    cause = err.into_inner().js_cause()
+                    cause = err.into_inner().js_cause();
                 };
                 Some(Kind::ConnectionLost)
             }

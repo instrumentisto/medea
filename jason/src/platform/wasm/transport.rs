@@ -80,7 +80,7 @@ struct InnerSocket {
 
 impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
-        let socket = SysWebSocket::new(&url)
+        let socket = SysWebSocket::new(url)
             .map_err(Into::into)
             .map_err(TransportError::CreateSocket)
             .map_err(tracerr::wrap!())?;
